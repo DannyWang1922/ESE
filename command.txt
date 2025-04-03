@@ -3,9 +3,9 @@ python eval_nli.py --pooling_strategy cls --model_name_or_path google-bert/bert-
 python eval_nli.py --pooling_strategy cls  --model_name_or_path BAAI/bge-base-en-v1.5 
 python eval_nli.py --pooling_strategy cls  --model_name_or_path WhereIsAI/UAE-Large-V1
 python eval_nli.py --pooling_strategy mean --model_name_or_path Qwen/Qwen1.5-0.5B
-
 python eval_nli.py --pooling_strategy mean --model_name_or_path WhereIsAI/ese-qwen-0.5b-nli
 
 python train.py --model_name_or_path google-bert/bert-base-uncased  --train_name_or_path nyu-mll/multi_nli
-
 python train.py --model_name_or_path WhereIsAI/UAE-Large-V1  --train_name_or_path nyu-mll/multi_nli
+
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train.py
