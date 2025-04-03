@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_name_or_path', type=str, default="WhereIsAI/UAE-Large-V1",
+parser.add_argument('--model_name_or_path', type=str, default="BAAI/bge-base-en-v1.5",
                     help='Specify model name or path to set transformer backbone, required')
 parser.add_argument('--pretrained_model_path', type=str, default=None,
                     help='Specify pretrained model path to load pretrained model, default None')
