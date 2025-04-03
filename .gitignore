@@ -1,0 +1,4 @@
+result/
+__pycache__/
+SentEval/data/downstream/*
+!SentEval/data/downstream/download_dataset.sh
