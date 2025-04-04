@@ -1,8 +1,8 @@
 import subprocess
 
 cmd_list = [
-    'python train_self.py --model_name_or_path BAAI/bge-base-en-v1.5  --apply_ese 0 --save_dir result_beg',
-    'python train_self.py --model_name_or_path BAAI/bge-base-en-v1.5  --apply_ese 1 --save_dir result_beg_ese',
+    'NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --model_name_or_path BAAI/bge-base-en-v1.5  --apply_ese 0 --save_dir result_beg',
+    'NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --model_name_or_path BAAI/bge-base-en-v1.5  --apply_ese 1 --save_dir result_beg_ese',
 ]
 
 for cmd in cmd_list:
