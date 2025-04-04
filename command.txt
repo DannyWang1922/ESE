@@ -11,8 +11,8 @@ python train.py --model_name_or_path WhereIsAI/UAE-Large-V1  --train_name_or_pat
 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train.py
 
 
-python train.py --model_name_or_path BAAI/bge-base-en-v1.5  --train_name_or_path nyu-mll/multi_nli  --apply_ese 0 --save_dir result_beg
-python train.py --model_name_or_path BAAI/bge-base-en-v1.5  --train_name_or_path nyu-mll/multi_nli  --apply_ese 1 --save_dir result_beg_ese
+python train_self.py --model_name_or_path BAAI/bge-base-en-v1.5  --apply_ese 0 --save_dir result_beg
+python train_self.py --model_name_or_path BAAI/bge-base-en-v1.5  --apply_ese 1 --save_dir result_beg_ese
 
-python train.py --model_name_or_path WhereIsAI/UAE-Large-V1  --train_name_or_path nyu-mll/multi_nli  --apply_ese 1 --save_dir result_uae
+python train.py --model_name_or_path WhereIsAI/UAE-Large-V1  --train_name_or_path nyu-mll/multi_nli  --apply_ese 0 --save_dir result_uae
 python train.py --model_name_or_path WhereIsAI/UAE-Large-V1  --train_name_or_path nyu-mll/multi_nli  --apply_ese 1 --save_dir result_uae_ese
