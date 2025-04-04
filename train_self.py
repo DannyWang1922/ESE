@@ -168,82 +168,6 @@ def main():
                   is_llm=args.is_llm,
                   apply_billm=args.apply_billm,
                   billm_model_class=args.billm_model_class)
-    
-    # # Loading dataset 1
-    # logger.info("Loading multi_nli dataset...")
-    # multi_ds = load_dataset(
-    #     'nyu-mll/multi_nli',
-    #     args.train_subset_name,
-    #     split="train",
-    #     num_proc=args.workers,
-    #     streaming=args.streaming
-    # )
-
-    # logger.info("Loading snli dataset...")
-    # snli_ds = load_dataset(
-    #     'stanfordnlp/snli',
-    #     split="train",
-    #     num_proc=args.workers,
-    #     streaming=args.streaming
-    # )
-
-    # def format_fn(obj):
-    #     return {
-    #         "text1": str(obj.get("premise", "")),
-    #         "text2": str(obj.get("hypothesis", "")),
-    #         "label": obj.get("label", -1)
-    #     }
-    
-    # logger.info("Mapping datasets to unified format...")
-    # multi_ds = multi_ds.map(format_fn)
-    # snli_ds = snli_ds.map(format_fn)
-
-    # # 合并两个数据集（非streaming模式）
-    # logger.info("Chaining datasets in streaming mode...")
-    # combined_ds = interleave_datasets([multi_ds, snli_ds])
-
-    # # Tokenization
-    # logger.info("Tokenizing combined dataset...")
-    # train_ds = combined_ds.shuffle(seed=args.dataset_seed).map(
-    #     AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
-    #     num_proc=args.workers
-    # )
-    # print(train_ds)
-
-    # # Loading validation datasets
-    # logger.info("Loading multi_nli validation dataset...")
-    # multi_valid_ds = load_dataset(
-    #     'nyu-mll/multi_nli',
-    #     args.valid_subset_name,
-    #     split="validation_matched",
-    #     num_proc=args.workers,
-    #     streaming=args.streaming
-    # )
-
-    # logger.info("Loading snli validation dataset...")
-    # snli_valid_ds = load_dataset(
-    #     'stanfordnlp/snli',
-    #     split="validation",
-    #     num_proc=args.workers,
-    #     streaming=args.streaming
-    # )
-
-    # # 应用相同的格式化函数
-    # logger.info("Mapping validation datasets to unified format...")
-    # multi_valid_ds = multi_valid_ds.map(format_fn)
-    # snli_valid_ds = snli_valid_ds.map(format_fn)
-
-    # # 合并验证数据集
-    # logger.info("Chaining validation datasets...")
-    # valid_ds = interleave_datasets([multi_valid_ds, snli_valid_ds])
-
-    # # Tokenization for validation dataset
-    # logger.info("Tokenizing combined validation dataset...")
-    # valid_ds = valid_ds.shuffle(seed=args.dataset_seed).map(
-    #     AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
-    #     num_proc=args.workers
-    # )
-    # print(valid_ds)
 
 
     def load_and_prepare_dataset(split_multi, split_snli, args, model, is_training=True):
@@ -288,24 +212,12 @@ def main():
         )
         return combined_ds
 
-    # 加载训练集
-    train_ds = load_and_prepare_dataset(
-        split_multi="train",
-        split_snli="train",
-        args=args,
-        model=model,
-        is_training=True
-    )
+    # load train set
+    train_ds = load_and_prepare_dataset(split_multi="train", split_snli="train", args=args, model=model, is_training=True)
     print(train_ds)
 
-    # 加载验证集
-    valid_ds = load_and_prepare_dataset(
-        split_multi="validation_matched",
-        split_snli="validation",
-        args=args,
-        model=model,
-        is_training=False
-    )
+    # load val set
+    valid_ds = load_and_prepare_dataset(split_multi="validation_matched", split_snli="validation", args=args, model=model, is_training=False)
     print(valid_ds)
 
     argument_kwargs = {}
@@ -356,6 +268,7 @@ def main():
         apply_ese=args.apply_ese,
         trainer_kwargs=trainer_kwargs,
         save_strategy = 'epoch',
+        save_total_limit = 10
     )
 
 
