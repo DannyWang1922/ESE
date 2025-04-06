@@ -45,7 +45,7 @@ parser.add_argument('--seed', type=int, default=-1,
                     help='Specify random seed, default -1')
 parser.add_argument('--dataset_seed', type=int, default=None,
                     help='Specify dataset random seed, default None')
-parser.add_argument('--workers', type=int, default=2,
+parser.add_argument('--workers', type=int, default=8,
                     help='Specify dataset workers, default 2')
 parser.add_argument('--cosine_w', type=float, default=1.0,
                     help='Specify weight for cosine loss, default 1.0')
@@ -216,9 +216,10 @@ def main():
     train_ds = load_and_prepare_dataset(split_multi="train", split_snli="train", args=args, model=model, is_training=True)
     print(train_ds)
 
-    # load val set
-    valid_ds = load_and_prepare_dataset(split_multi="validation_matched", split_snli="validation", args=args, model=model, is_training=False)
-    print(valid_ds)
+    # # load val set
+    # valid_ds = load_and_prepare_dataset(split_multi="validation_matched", split_snli="validation", args=args, model=model, is_training=False)
+    # print(valid_ds)
+    valid_ds = None
 
     argument_kwargs = {}
     if args.push_to_hub:
