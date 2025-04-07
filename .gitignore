@@ -5,3 +5,5 @@ SentEval/data/downstream/*
 models/
 nan_layers.txt
 eval_result/
+evl_sts_bench_res/
+eval_main_result/
