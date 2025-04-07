@@ -4,3 +4,4 @@ SentEval/data/downstream/*
 !SentEval/data/downstream/download_dataset.sh
 models/
 nan_layers.txt
+eval_result/
