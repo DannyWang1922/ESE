@@ -39,7 +39,7 @@ parser.add_argument('--prompt_template', type=str, default=None,
                     help='Specify prompt_template like "xxx: {text}", default None.'
                          'This prompt will be applied for all text columns.'
                          'If you want to specify different prompts for different text columns, please specify it manually.')
-parser.add_argument('--save_dir', type=str, default="result",
+parser.add_argument('--save_dir', type=str, default="train_res",
                     help='Specify save dir, default None')
 parser.add_argument('--seed', type=int, default=-1,
                     help='Specify random seed, default -1')
@@ -84,7 +84,7 @@ parser.add_argument('--tokenizer_padding_side', type=str, default=None, choices=
 parser.add_argument('--epochs', type=int, default=10, help='Specify epochs, default 10')
 parser.add_argument('--max_steps', type=int, default=-1,
                     help='Specify max steps, default -1 (Automatically calculated from epochs)')
-parser.add_argument('--save_steps', type=int, default=100, help='Specify save_steps, default 1000')
+parser.add_argument('--save_steps', type=int, default=1000, help='Specify save_steps, default 1000')
 parser.add_argument('--batch_size', type=int, default=32, help='Specify batch size, default 32')
 parser.add_argument('--maxlen', type=int, default=512, help='Specify max length, default 512')
 parser.add_argument('--streaming', action='store_true', default=False,
@@ -170,7 +170,7 @@ def main():
                   billm_model_class=args.billm_model_class)
 
 
-    def load_and_prepare_dataset(split_multi, split_snli, args, model, is_training=True):
+    def load_train_set(split_multi, split_snli, args, model, is_training=True):
         logger.info(f"Loading multi_nli {split_multi} dataset...")
         multi_ds = load_dataset(
             'nyu-mll/multi_nli',
@@ -211,15 +211,32 @@ def main():
             num_proc=args.workers
         )
         return combined_ds
+    
+    def load_validation_set(args, model):
+        logger.info("Loading stsbenchmark-sts validation set...")
+        ds = load_dataset("mteb/stsbenchmark-sts", split="validation", num_proc=args.workers)
+
+        def format_fn(obj):
+            return {
+                "text1": str(obj.get("sentence1", "")),
+                "text2": str(obj.get("sentence2", "")),
+                "label": float(obj.get("score", 0.0)) / 5.0  # normalize to [0, 1]
+            }
+
+        ds = ds.map(format_fn)
+        ds = ds.map(
+            AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
+            num_proc=args.workers
+        )
+        return ds
 
     # load train set
-    train_ds = load_and_prepare_dataset(split_multi="train", split_snli="train", args=args, model=model, is_training=True)
+    train_ds = load_train_set(split_multi="train", split_snli="train", args=args, model=model, is_training=True)
     print(train_ds)
 
-    # # load val set
-    # valid_ds = load_and_prepare_dataset(split_multi="validation_matched", split_snli="validation", args=args, model=model, is_training=False)
-    # print(valid_ds)
-    valid_ds = None
+    # load val set
+    valid_ds = load_validation_set(args, model)
+    print(valid_ds)
 
     argument_kwargs = {}
     if args.push_to_hub:
@@ -268,8 +285,8 @@ def main():
         argument_kwargs=argument_kwargs,
         apply_ese=args.apply_ese,
         trainer_kwargs=trainer_kwargs,
-        save_strategy = 'epoch',
-        save_total_limit = 10
+        eval_steps =args.save_steps,
+        save_total_limit = 3,
     )
 
 

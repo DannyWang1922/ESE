@@ -19,3 +19,6 @@ python eval_ese_sts_bench.py --is_llm 0 --pooling_strategy cls --model_names_or_
 python eval_nli_main.py --is_llm 1 --pooling_strategy mean --model_name_or_path WhereIsAI/ese-qwen-0.5b-nli --out_dir evl_res/main_qwen_ese
 python eval_nli_main.py --is_llm 1 --pooling_strategy mean --model_name_or_path Qwen/Qwen1.5-0.5B --out_dir evl_res/main_qwen
 python eval_ese_sts_bench.py --is_llm 1 --pooling_strategy mean --model_names_or_paths WhereIsAI/ese-qwen-0.5b-nli,Qwen/Qwen1.5-0.5B --out_dir evl_res/plot_qwen
+
+python train_self.py --epochs 5 --batch_size 256 --is_llm 0 --pooling_strategy cls --model_name_or_path BAAI/bge-base-en-v1.5 --apply_ese 0 --save_dir train_res/bge
+python train_self.py --epochs 5 --batch_size 256 --is_llm 0 --pooling_strategy cls --model_name_or_path BAAI/bge-base-en-v1.5 --apply_ese 1 --save_dir train_res/bge_ese
