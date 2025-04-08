@@ -39,9 +39,6 @@ def create_batcher(args, model, tokenizer, backbone, layer_index=None, embedding
         
         if args.prompt_template:
             sentences = [args.prompt_template.format(text=s) for s in sentences]
-
-        if args.is_llm and "llama" in args.model_name_or_path.lower():
-            tokenizer.pad_token = tokenizer.eos_token
             
         tok = tokenizer(sentences, padding='longest', max_length=args.max_length, truncation=True, return_tensors='pt')
         for k, v in tok.items():
@@ -57,10 +54,10 @@ def create_batcher(args, model, tokenizer, backbone, layer_index=None, embedding
         
     return batcher
 
-def get_senteval_params():
+def get_senteval_params(args):
     """Get standard parameters for SentEval"""
     params = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10, 'batch_size': 16}
-    params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 64, 'tenacity': 5, 'epoch_size': 4}
+    params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': args.eval_batch_size, 'tenacity': 5, 'epoch_size': 4}
     return params
 
 def prepare(params, samples):
@@ -79,7 +76,7 @@ def evaluate_task(se, task):
 def evaluate_single_layer(args, model, tokenizer, backbone, tasks, layer_index, embedding_size):
     """Evaluate the performance of a single layer and embedding size"""
     batcher = create_batcher(args, model, tokenizer, backbone, layer_index, embedding_size)
-    params = get_senteval_params()
+    params = get_senteval_params(args)
     try:
         results = {}
         for task in tasks:
@@ -185,14 +182,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
     parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
-    parser.add_argument("--layer_size", type=int, default=3, help="Number of layers to evaluate")
+    parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
-    parser.add_argument("--model_names_or_paths", type=str, default=None, help="Comma-separated list of model names or paths")
+    parser.add_argument("--model_name_or_path_list", type=str, default=None, help="Comma-separated list of model names or paths")
     parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
-    parser.add_argument('--embedding_size_list', type=str, default="32, 64, 128", help="Comma-separated list of embedding sizes to evaluate")
-    parser.add_argument('--out_dir', type=str, default="evl_sts_bench_res", help="Directory to save output files")
+    parser.add_argument('--embedding_size_list', type=str, default="50,100,150,200,250,300,350,400,450,500", help="Comma-separated list of embedding sizes to evaluate")
+    parser.add_argument('--out_dir', type=str, default="evl_res/plot", help="Directory to save output files")
+    parser.add_argument('--eval_batch_size', type=int, default=32, help="Eavluation batch size")
 
     args = parser.parse_args()
 
@@ -204,25 +202,25 @@ def main():
     print("Using device:", device)
 
     # 获取模型列表
-    if args.model_names_or_paths:
-        model_names = args.model_names.split(",") if args.model_names else [args.model_name_or_path]
+    if args.model_name_or_path_list:
+        model_names = args.model_names.split(",") if args.model_names else [args.model_name_or_path_list]
     else:
-        #  model_names = ["Qwen/Qwen1.5-0.5B", "WhereIsAI/ese-qwen-0.5b-nli"]
+        # model_names = ["WhereIsAI/ese-qwen-0.5b-nli", "Qwen/Qwen1.5-0.5B"]
         model_names = ["models/beg_ese", "models/beg"]
     model_results_matrix = []
 
-    for model_name_or_path in model_names:
-        print(f"\nEvaluating model: {model_name_or_path}")
-        model_out_dir = os.path.join(args.out_dir, model_name_or_path.split("/")[-1].replace("-", "_"))
+    for model_name in model_names:
+        print(f"\nEvaluating model: {model_name}")
+        model_out_dir = os.path.join(args.out_dir, model_name.split("/")[-1].replace("-", "_"))
         os.makedirs(model_out_dir, exist_ok=True)
 
         # Initialize model, tokenizer, and Pooler
         if args.is_llm:
             backbone = AutoModelForCausalLM.from_pretrained(
-                model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+                model_name, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
         else:
             backbone = AutoModel.from_pretrained(
-                model_name_or_path, output_hidden_states=True).to(device)
+                model_name, output_hidden_states=True).to(device)
 
         if args.is_llm and args.lora_weight:
             backbone = PeftModel.from_pretrained(
@@ -230,7 +228,9 @@ def main():
             backbone.print_trainable_parameters()
 
         model = Pooler(backbone, pooling_strategy=args.pooling_strategy)
-        tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if args.is_llm and "llama" in model_name.lower():
+            tokenizer.pad_token = tokenizer.eos_token
 
         # Get number of model layers
         if hasattr(backbone, 'encoder') and hasattr(backbone.encoder, 'layer'):
@@ -240,7 +240,7 @@ def main():
         elif hasattr(backbone, 'model') and hasattr(backbone.model, 'layers'):
             n_layers = len(backbone.model.layers)
         else:
-            config = AutoConfig.from_pretrained(model_name_or_path)
+            config = AutoConfig.from_pretrained(model_name)
             n_layers = config.num_hidden_layers
         if n_layers is None:
             raise ValueError("Cannot determine the number of layers in the model.")
@@ -255,7 +255,7 @@ def main():
             row = []
             for emb_size in embedding_sizes:
                 score = evaluate_single_layer(args, model, tokenizer, backbone, tasks, layer_index, emb_size)
-                print(f"Model {model_name_or_path}, Layer {layer_index}, Embedding Size {emb_size} => Avg Score: {score:.2f}")
+                print(f"Model {model_name}, Layer {layer_index}, Embedding Size {emb_size} => Avg Score: {score:.2f}")
                 row.append(score)
             results_matrix.append(row)
 
@@ -267,7 +267,7 @@ def main():
             writer.writerow(header)
             for i, row in enumerate(results_matrix):
                 writer.writerow([layer_indices[i]] + row)
-        print(f"\nEvaluation results for model {model_name_or_path} saved to {csv_file}")
+        print(f"\nEvaluation results for model {model_name} saved to {csv_file}")
         model_results_matrix.append(results_matrix)
 
     # Plot results

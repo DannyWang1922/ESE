@@ -73,10 +73,10 @@ def create_batcher(args, model, tokenizer, backbone, layer_index=None, embedding
         
     return batcher
 
-def get_senteval_params():
+def get_senteval_params(args):
     """Get standard parameters for SentEval"""
     params = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10, 'batch_size': 16}
-    params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 64, 'tenacity': 5, 'epoch_size': 4}
+    params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': args.eval_batch_size, 'tenacity': 5, 'epoch_size': 4}
     return params
 
 def prepare(params, samples):
@@ -99,7 +99,7 @@ def evaluate_layers(layer_indices, args, model, tokenizer, backbone, tasks):
 
     for layer_index in layer_indices:
         batcher = create_batcher(args, model, tokenizer, backbone, layer_index)
-        params = get_senteval_params()
+        params = get_senteval_params(args)
         try:
             results = {}
             for task in tasks:
@@ -142,7 +142,8 @@ def main():
     parser.add_argument("--mode", type=str, choices=['dev', 'test', 'fasttest'], default='test', help="Evaluation mode")
     parser.add_argument("--task_set", type=str, choices=['sts', 'transfer', 'full', 'na'], default='sts', help="Task set")
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
-    parser.add_argument('--out_dir', type=str, default="eval_main_result", help="Directory to save output files") 
+    parser.add_argument('--out_dir', type=str, default="evl_res/main", help="Directory to save output files")
+    parser.add_argument('--eval_batch_size', type=int, default=32, help="Eavluation batch size")
 
     args = parser.parse_args()
 
@@ -195,7 +196,7 @@ def main():
     
     # Main table
     batcher = create_batcher(args, model, tokenizer, backbone)
-    params = get_senteval_params()
+    params = get_senteval_params(args)
     
     results = {}
     for task in args.tasks:
