@@ -12,6 +12,7 @@ from datasets import load_dataset
 
 from espresso import AnglE, AngleDataTokenizer
 from datasets import interleave_datasets
+from datasets import concatenate_datasets
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
@@ -23,15 +24,15 @@ parser.add_argument('--pretrained_model_path', type=str, default=None,
                     help='Specify pretrained model path to load pretrained model, default None')
 parser.add_argument('--pretrained_lora_path', type=str, default=None,
                     help='Specify pretrained lora path to load lora, default None')
-# parser.add_argument('--train_name_or_path', type=str, default="nyu-mll/multi_nli",
-#                     help='Specify huggingface datasets name or local file path for train set, required')
+parser.add_argument('--train_name_or_path', type=str, default=None,
+                    help='Specify huggingface datasets name or local file path for train set, required')
 parser.add_argument('--train_subset_name', type=str, default=None,
                     help='Specify huggingface datasets subset name for train set, default None')
 parser.add_argument('--train_split_name', type=str, default='train',
                     help='Specify huggingface datasets split name for train set, default `train`')
-parser.add_argument('--valid_name_or_path', type=str, default=None,
+parser.add_argument('--valid_name_or_path', type=str, default="mteb/stsbenchmark-sts",
                     help='Specify huggingface datasets name or local file path for valid set, default None.')
-parser.add_argument('--valid_subset_name', type=str, default=None,
+parser.add_argument('--valid_subset_name', type=str, default="test",
                     help='Specify huggingface datasets subset name for valid set, default None')
 parser.add_argument('--valid_split_name', type=str, default='train',
                     help='Specify huggingface datasets split name for valid set, default `train`')
@@ -75,8 +76,8 @@ parser.add_argument('--learning_rate', type=float, default=1e-5,
                     help='Specify learning_rate, defaut 1e-5')
 parser.add_argument('--warmup_steps', type=int, default=100,
                     help='Specify warmup_steps, defaut 100')
-parser.add_argument('--logging_steps', type=int, default=500,
-                    help='Specify logging_steps, defaut 500')
+parser.add_argument('--logging_steps', type=int, default=100,
+                    help='Specify logging_steps, defaut 100')
 parser.add_argument('--pooling_strategy', type=str, default='cls',
                     help='Specify pooling_strategy from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')
 parser.add_argument('--tokenizer_padding_side', type=str, default=None, choices=['left', 'right'],
@@ -108,7 +109,7 @@ parser.add_argument('--apply_billm', type=int, default=0, choices=[0, 1],
 parser.add_argument('--billm_model_class', type=str, default=None,
                     help='Specify billm model class name, default None')
 # configure ESE
-parser.add_argument('--apply_ese', type=int, default=1, choices=[0, 1],
+parser.add_argument('--apply_ese', type=int, default=0, choices=[0, 1],
                     help='Specify apply_ese to support Espresso Sentence Embedding training, default 0')
 parser.add_argument('--ese_kl_temperature', type=float, default=1.0,
                     help='Specify KL temperature for ese, default 1.0')
@@ -119,9 +120,9 @@ parser.add_argument('--teacher_name_or_path', type=str, default=None,
                     help='Specify model_name_or_path for teacher alignment, default None')
 parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
-# # configure wandb
-# parser.add_argument('--wandb_project', type=str, default=None, help='Specify WANDB_PROJECT, default None')
-# parser.add_argument('--wandb_log_model', type=str, default=None, help='Specify WANDB_LOG_MODEL, default None')
+# configure wandb
+parser.add_argument('--wandb_project', type=str, default="ESE", help='Specify WANDB_PROJECT, default None')
+parser.add_argument('--wandb_log_model', type=str, default="True", help='Specify WANDB_LOG_MODEL, default None')
 
 args = parser.parse_args()
 logger.info(f'Args: {args}')
@@ -131,6 +132,14 @@ if args.seed is not None and args.seed > 0:
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+
+if args.wandb_project is not None:
+    import wandb
+    logger.info('Set up wandb...')
+    os.environ['WANDB_PROJECT'] = args.wandb_project
+    os.environ['WANDB_LOG_MODEL'] = args.wandb_log_model
+
+    wandb.login()
 
 if args.torch_dtype == 'float32':
     args.torch_dtype = torch.float32
@@ -169,74 +178,64 @@ def main():
                   apply_billm=args.apply_billm,
                   billm_model_class=args.billm_model_class)
 
+    if args.train_name_or_path is not None:
+        dataset_path_list = [ds for ds in args.train_name_or_path.split(",")]
+    else:
+        dataset_path_list = ["nyu-mll/multi_nli", "stanfordnlp/snli"]
 
-    def load_train_set(split_multi, split_snli, args, model, is_training=True):
-        logger.info(f"Loading multi_nli {split_multi} dataset...")
-        multi_ds = load_dataset(
-            'nyu-mll/multi_nli',
-            split=split_multi,
-            num_proc=args.workers,
-            streaming=args.streaming
-        )
-        
-        logger.info(f"Loading snli {split_snli} dataset...")
-        snli_ds = load_dataset(
-            'stanfordnlp/snli',
-            split=split_snli,
-            num_proc=args.workers,
-            streaming=args.streaming
-        )
-
-        def format_fn(obj):
-            return {
-                "text1": str(obj.get("premise", "")),
-                "text2": str(obj.get("hypothesis", "")),
-                "label": obj.get("label", -1)
-            }
-
-        logger.info("Mapping datasets to unified format...")
-        multi_ds = multi_ds.map(format_fn)
-        snli_ds = snli_ds.map(format_fn)
-
-        logger.info(f"multi_ds length: {len(multi_ds)}")
-        logger.info(f"snli_ds length: {len(snli_ds)}")
-
-        logger.info(f"Chaining {'training' if is_training else 'validation'} datasets...")
-        combined_ds = interleave_datasets([multi_ds, snli_ds], stopping_strategy="all_exhausted")
-        logger.info(f"Combined dataset length: {len(combined_ds)}")
-
-        logger.info("Tokenizing combined dataset...")
-        combined_ds = combined_ds.shuffle(seed=args.dataset_seed).map(
-            AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
-            num_proc=args.workers
-        )
-        return combined_ds
+    all_train_datasets = []
+    for dataset_path in dataset_path_list:
+        if os.path.exists(dataset_path):
+            ds = load_dataset('json',
+                            data_files=[dataset_path],
+                            num_proc=args.workers,
+                            streaming=args.streaming)
+        else:
+            ds = load_dataset(dataset_path,
+                            args.train_subset_name,
+                            num_proc=args.workers,
+                            streaming=args.streaming)
+        ds = ds.map(lambda obj: {"text1": str(obj["premise"]), "text2": str(obj["hypothesis"]), "label": obj["label"]})
+        ds = ds.select_columns(["text1", "text2", "label"])
+        logger.info(f'Training dataset overview {dataset_path}:')
+        all_train_datasets.append(ds[args.train_split_name])
     
-    def load_validation_set(args, model):
-        logger.info("Loading stsbenchmark-sts validation set...")
-        ds = load_dataset("mteb/stsbenchmark-sts", split="validation", num_proc=args.workers)
+    logger.info('All datasets loaded. Concatenating...')
+    if args.streaming:
+        from itertools import chain
+        combined_dataset = all_train_datasets[0]
+        for ds in all_train_datasets[1:]:
+            combined_dataset = combined_dataset.concatenate(ds)
+    else:
+        combined_dataset = concatenate_datasets(all_train_datasets)
+    print("Combined_dataset: \n", combined_dataset)
 
-        def format_fn(obj):
-            return {
-                "text1": str(obj.get("sentence1", "")),
-                "text2": str(obj.get("sentence2", "")),
-                "label": float(obj.get("score", 0.0)) / 5.0  # normalize to [0, 1]
-            }
+    logger.info('Processing train...')
+    train_ds = combined_dataset.shuffle(args.dataset_seed).map(
+        AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
+        num_proc=args.workers)
+    
+    valid_ds = None
+    if valid_ds is None and args.valid_name_or_path is not None:
+        logger.info('Validation detected, processing validation...')
+        if os.path.exists(args.valid_name_or_path):
+            valid_ds = load_dataset('json', data_files=[args.valid_name_or_path], num_proc=args.workers)
+        else:
+            if args.valid_subset_name is not None:
+                valid_ds = load_dataset(args.valid_name_or_path, split=args.valid_subset_name, num_proc=args.workers)
+            else:
+                valid_ds = load_dataset(args.valid_name_or_path, num_proc=args.workers)
+        
+        valid_ds = valid_ds.map(lambda obj: {"text1": str(obj["sentence1"]), 
+                                             "text2": str(obj['sentence2']), 
+                                             "label": float(obj.get("score", 0.0)) / 5.0})  # normalize to [0, 1]})
+        valid_ds = valid_ds.select_columns(["text1", "text2", "label"])
 
-        ds = ds.map(format_fn)
-        ds = ds.map(
+        valid_ds = valid_ds.map(
             AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
-            num_proc=args.workers
-        )
-        return ds
-
-    # load train set
-    train_ds = load_train_set(split_multi="train", split_snli="train", args=args, model=model, is_training=True)
-    print(train_ds)
-
-    # load val set
-    valid_ds = load_validation_set(args, model)
-    print(valid_ds)
+            num_proc=args.workers)
+    logger.info(f'Training dataset overview {dataset_path}:')
+    print(valid_ds, "\n")
 
     argument_kwargs = {}
     if args.push_to_hub:
@@ -244,8 +243,8 @@ def main():
         argument_kwargs['push_to_hub'] = True
         argument_kwargs['hub_private_repo'] = bool(args.hub_private_repo)
         argument_kwargs['hub_model_id'] = args.hub_model_id
-    # if args.wandb_project is not None:
-    #     argument_kwargs['report_to'] = 'wandb'
+    if args.wandb_project is not None:
+        argument_kwargs['report_to'] = 'wandb'
     if args.max_steps > 0:
         argument_kwargs['max_steps'] = args.max_steps
 

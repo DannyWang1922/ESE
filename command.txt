@@ -12,9 +12,9 @@ NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_nli_main
 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_ese_sts_bench.py
 
 
-python eval_nli_main.py --is_llm 0 --pooling_strategy cls --model_name_or_path models/beg_ese --out_dir evl_res/main_beg_ese
-python eval_nli_main.py --is_llm 0 --pooling_strategy cls --model_name_or_path models/beg --out_dir evl_res/main_beg
-python eval_ese_sts_bench.py --is_llm 0 --pooling_strategy cls --model_names_or_paths models/beg_ese,models/beg --out_dir evl_res/plot_beg
+python eval_nli_main.py --is_llm 0 --pooling_strategy cls --model_name_or_path models/bge_ese --out_dir evl_res/main_bge_ese
+python eval_nli_main.py --is_llm 0 --pooling_strategy cls --model_name_or_path models/bge --out_dir evl_res/main_bge
+python eval_ese_sts_bench.py --is_llm 0 --pooling_strategy cls --model_names_or_paths models/bge_ese,models/bge --out_dir evl_res/plot_bge
 
 python eval_nli_main.py --is_llm 1 --pooling_strategy mean --model_name_or_path WhereIsAI/ese-qwen-0.5b-nli --out_dir evl_res/main_qwen_ese
 python eval_nli_main.py --is_llm 1 --pooling_strategy mean --model_name_or_path Qwen/Qwen1.5-0.5B --out_dir evl_res/main_qwen
