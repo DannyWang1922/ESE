@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import json
 import os
 import logging
 import argparse
@@ -32,7 +33,7 @@ parser.add_argument('--train_split_name', type=str, default='train',
                     help='Specify huggingface datasets split name for train set, default `train`')
 parser.add_argument('--valid_name_or_path', type=str, default="mteb/stsbenchmark-sts",
                     help='Specify huggingface datasets name or local file path for valid set, default None.')
-parser.add_argument('--valid_subset_name', type=str, default="test",
+parser.add_argument('--valid_subset_name', type=str, default=None,
                     help='Specify huggingface datasets subset name for valid set, default None')
 parser.add_argument('--valid_split_name', type=str, default='train',
                     help='Specify huggingface datasets split name for valid set, default `train`')
@@ -46,13 +47,13 @@ parser.add_argument('--seed', type=int, default=-1,
                     help='Specify random seed, default -1')
 parser.add_argument('--dataset_seed', type=int, default=None,
                     help='Specify dataset random seed, default None')
-parser.add_argument('--workers', type=int, default=8,
+parser.add_argument('--workers', type=int, default=16,
                     help='Specify dataset workers, default 2')
 parser.add_argument('--cosine_w', type=float, default=1.0,
                     help='Specify weight for cosine loss, default 1.0')
 parser.add_argument('--ibn_w', type=float, default=1.0,
                     help='Specify weight for ibn loss, default 1.0')
-parser.add_argument('--angle_w', type=float, default=1.0,
+parser.add_argument('--angle_w', type=float, default=0.02,
                     help='Specify weight for angle loss, default 1.0')
 parser.add_argument('--angle_tau', type=float, default=20.0,
                     help='Specify angle_tau, default 20.0')
@@ -72,7 +73,7 @@ parser.add_argument('--lora_dropout', type=float, default=0.1,
                     help='Specify lora_dropout, defaut 0.1')
 parser.add_argument('--lora_target_modules', type=str, default=None,
                     help='Specify lora_target_modules. comma serves as the splitter, such as `W,b`. Defaut None')
-parser.add_argument('--learning_rate', type=float, default=1e-5,
+parser.add_argument('--learning_rate', type=float, default=5e-5,
                     help='Specify learning_rate, defaut 1e-5')
 parser.add_argument('--warmup_steps', type=int, default=100,
                     help='Specify warmup_steps, defaut 100')
@@ -122,7 +123,7 @@ parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
 # configure wandb
 parser.add_argument('--wandb_project', type=str, default="ESE", help='Specify WANDB_PROJECT, default None')
-parser.add_argument('--wandb_log_model', type=str, default="True", help='Specify WANDB_LOG_MODEL, default None')
+parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
 args = parser.parse_args()
 logger.info(f'Args: {args}')
@@ -160,6 +161,9 @@ lora_config = {
 if args.lora_target_modules is not None:
     lora_config['target_modules'] = [v.strip() for v in args.lora_target_modules.split(',') if v.strip()]
 
+os.makedirs(args.save_dir, exist_ok=True)
+with open(os.path.join(args.save_dir, "parser_para.json"), "w") as f:
+    json.dump(vars(args), f, indent=4)
 
 def main():
     model = AnglE(args.model_name_or_path,
@@ -199,6 +203,7 @@ def main():
         ds = ds.select_columns(["text1", "text2", "label"])
         logger.info(f'Training dataset overview {dataset_path}:')
         all_train_datasets.append(ds[args.train_split_name])
+        print(ds)
     
     logger.info('All datasets loaded. Concatenating...')
     if args.streaming:
@@ -222,7 +227,7 @@ def main():
             valid_ds = load_dataset('json', data_files=[args.valid_name_or_path], num_proc=args.workers)
         else:
             if args.valid_subset_name is not None:
-                valid_ds = load_dataset(args.valid_name_or_path, split=args.valid_subset_name, num_proc=args.workers)
+                valid_ds = load_dataset(args.valid_name_or_path, args.valid_subset_name, num_proc=args.workers)
             else:
                 valid_ds = load_dataset(args.valid_name_or_path, num_proc=args.workers)
         
@@ -230,12 +235,12 @@ def main():
                                              "text2": str(obj['sentence2']), 
                                              "label": float(obj.get("score", 0.0)) / 5.0})  # normalize to [0, 1]})
         valid_ds = valid_ds.select_columns(["text1", "text2", "label"])
+        logger.info(f'Test dataset overview {dataset_path}:')
+        print(valid_ds, "\n")   
 
-        valid_ds = valid_ds.map(
+        valid_ds = valid_ds[args.valid_split_name].map(
             AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
             num_proc=args.workers)
-    logger.info(f'Training dataset overview {dataset_path}:')
-    print(valid_ds, "\n")
 
     argument_kwargs = {}
     if args.push_to_hub:
@@ -285,7 +290,7 @@ def main():
         apply_ese=args.apply_ese,
         trainer_kwargs=trainer_kwargs,
         eval_steps =args.save_steps,
-        save_total_limit = 3,
+        save_total_limit = 1,
     )
 
 
