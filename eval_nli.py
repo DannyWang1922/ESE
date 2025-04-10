@@ -63,9 +63,12 @@ def main():
     parser.add_argument("--layer_index", type=int, default=-1)
     parser.add_argument("--embedding_start", type=int, default=0)
     parser.add_argument("--embedding_size", type=int, default=None)
-    parser.add_argument("--model_name_or_path", type=str, default="WhereIsAI/UAE-Large-V1", help="Transformers' model name or path")
+    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Transformers' model name or path")
+    # parser.add_argument("--prompt_template", type=str,
+    #                     default="Represent following sentence for general embedding: {text} <|end_of_text|>",
+    #                     help="Prompt template")
     parser.add_argument("--prompt_template", type=str,
-                        default="Represent following sentence for general embedding: {text} <|end_of_text|>",
+                        default=None,
                         help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="max len")
     parser.add_argument("--mode", type=str,

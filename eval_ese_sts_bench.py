@@ -77,17 +77,15 @@ def evaluate_single_layer(args, model, tokenizer, backbone, tasks, layer_index, 
     """Evaluate the performance of a single layer and embedding size"""
     batcher = create_batcher(args, model, tokenizer, backbone, layer_index, embedding_size)
     params = get_senteval_params(args)
-    try:
-        results = {}
-        for task in tasks:
-            se = senteval.engine.SE(params, batcher, prepare)
-            score, _ = evaluate_task(se, task)
-            results[task] = score
-        avg_score = sum(results.values()) / len(results)
-        return avg_score
-    except Exception as e:
-        print(f"Error at Layer {layer_index}, Embedding Size {embedding_size}: {e}")
-        return float('nan')
+    results = {}
+    for task in tasks:
+        se = senteval.engine.SE(params, batcher, prepare)
+        _, result = evaluate_task(se, task)
+        results[task] = result
+    score = results['STSBenchmark']['test']['spearman'].correlation * 100
+    score = round(score, 0) 
+    
+    return score
 
 def plot_layer_results(results_matrix_list, embedding_sizes, layer_indices, out_dir, model_names):
     """
@@ -185,10 +183,11 @@ def main():
     parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--model_name_or_path_list", type=str, default=None, help="Comma-separated list of model names or paths")
-    parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
+    # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
+    parser.add_argument("--prompt_template", type=str, default=None, help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
-    parser.add_argument('--embedding_size_list', type=str, default="50,100,150,200,250,300,350,400,450,500", help="Comma-separated list of embedding sizes to evaluate")
+    parser.add_argument('--embedding_size_list', type=str, default="75,150,225,300,375,450,525,600,675,750", help="Comma-separated list of embedding sizes to evaluate")
     parser.add_argument('--out_dir', type=str, default="evl_res/plot", help="Directory to save output files")
     parser.add_argument('--eval_batch_size', type=int, default=32, help="Eavluation batch size")
 
@@ -206,7 +205,7 @@ def main():
         model_names = args.model_names.split(",") if args.model_names else [args.model_name_or_path_list]
     else:
         # model_names = ["WhereIsAI/ese-qwen-0.5b-nli", "Qwen/Qwen1.5-0.5B"]
-        model_names = ["models/beg_ese", "models/beg"]
+        model_names = ["BAAI/bge-base-en-v1.5"]
     model_results_matrix = []
 
     for model_name in model_names:

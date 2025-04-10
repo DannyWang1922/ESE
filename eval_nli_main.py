@@ -100,24 +100,25 @@ def evaluate_layers(layer_indices, args, model, tokenizer, backbone, tasks):
     for layer_index in layer_indices:
         batcher = create_batcher(args, model, tokenizer, backbone, layer_index)
         params = get_senteval_params(args)
-        try:
-            results = {}
-            for task in tasks:
-                se = senteval.engine.SE(params, batcher, prepare)
-                score, _ = evaluate_task(se, task)
-                results[task] = score
-            avg_score = sum(results.values()) / len(results)
-            
-            if np.isnan(avg_score):
-                print(f"Layer {layer_index}: Avg STS Score = NaN (skipping)")
-                nan_layers.append(layer_index)
-            else:
-                layer_scores.append(avg_score)
-                print(f"Layer {layer_index}: Avg STS Score = {avg_score:.2f}")
+        scores = []
+        results = {}
+        for task in tasks:
+            se = senteval.engine.SE(params, batcher, prepare)
+            _, result = evaluate_task(se, task)
+            results[task] = result
+
+        for task in ['STS12', 'STS13', 'STS14', 'STS15', 'STS16']:
+            scores.append("%.2f" % (results[task]['all']['spearman']['all'] * 100))
+        scores.append("%.2f" % (results['STSBenchmark']['test']['spearman'].correlation * 100))
+        scores.append("%.2f" % (results['SICKRelatedness']['test']['spearman'].correlation * 100))
+        avg_score = sum([float(s) for s in scores]) / (len(scores))
         
-        except Exception as e:
-            print(f"Error in layer {layer_index}: {str(e)} (skipping)")
+        if np.isnan(avg_score):
+            print(f"Layer {layer_index}: Avg STS Score = NaN (skipping)")
             nan_layers.append(layer_index)
+        else:
+            layer_scores.append(avg_score)
+            print(f"Layer {layer_index}: Avg STS Score = {avg_score:.2f}")
     
     # Record problematic layers to file
     os.makedirs(args.out_dir, exist_ok=True)
@@ -136,14 +137,15 @@ def main():
     parser.add_argument("--layer_index", type=int, default=-1, help="Layer index to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
-    parser.add_argument("--model_name_or_path", type=str, default="models/beg_ese", help="Model name or path")
-    parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
+    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path")
+    # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
+    parser.add_argument("--prompt_template", type=str, default=None)
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
     parser.add_argument("--mode", type=str, choices=['dev', 'test', 'fasttest'], default='test', help="Evaluation mode")
     parser.add_argument("--task_set", type=str, choices=['sts', 'transfer', 'full', 'na'], default='sts', help="Task set")
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
     parser.add_argument('--out_dir', type=str, default="evl_res/main", help="Directory to save output files")
-    parser.add_argument('--eval_batch_size', type=int, default=32, help="Eavluation batch size")
+    parser.add_argument('--eval_batch_size', type=int, default=256, help="Eavluation batch size")
 
     args = parser.parse_args()
 
@@ -215,7 +217,8 @@ def main():
 
     # Compute average performance of non-final layers
     print("\n[≺ Avg.] Computing average STS performance of all non-final layers...")
-    layer_indices = list(range(n_layers - 1))
+    # layer_indices = list(range(n_layers - 1))
+    layer_indices = list(range(n_layers))
     sts_tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
     layer_scores = evaluate_layers(layer_indices, args, model, tokenizer, backbone, sts_tasks)
     pavg = sum(layer_scores) / len(layer_scores)
