@@ -43,13 +43,13 @@ parser.add_argument('--prompt_template', type=str, default=None,
                          'If you want to specify different prompts for different text columns, please specify it manually.')
 parser.add_argument('--save_dir', type=str, default="train_res",
                     help='Specify save dir, default None')
-parser.add_argument('--seed', type=int, default=-1,
+parser.add_argument('--seed', type=int, default=42,
                     help='Specify random seed, default -1')
-parser.add_argument('--dataset_seed', type=int, default=None,
+parser.add_argument('--dataset_seed', type=int, default=42,
                     help='Specify dataset random seed, default None')
 parser.add_argument('--workers', type=int, default=16,
                     help='Specify dataset workers, default 2')
-parser.add_argument('--cosine_w', type=float, default=1.0,
+parser.add_argument('--cosine_w', type=float, default=0.0,
                     help='Specify weight for cosine loss, default 1.0')
 parser.add_argument('--ibn_w', type=float, default=1.0,
                     help='Specify weight for ibn loss, default 1.0')
@@ -110,7 +110,7 @@ parser.add_argument('--apply_billm', type=int, default=0, choices=[0, 1],
 parser.add_argument('--billm_model_class', type=str, default=None,
                     help='Specify billm model class name, default None')
 # configure ESE
-parser.add_argument('--apply_ese', type=int, default=0, choices=[0, 1],
+parser.add_argument('--apply_ese', type=int, default=1, choices=[0, 1],
                     help='Specify apply_ese to support Espresso Sentence Embedding training, default 0')
 parser.add_argument('--ese_kl_temperature', type=float, default=1.0,
                     help='Specify KL temperature for ese, default 1.0')
