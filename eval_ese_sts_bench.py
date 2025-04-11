@@ -97,17 +97,38 @@ def plot_layer_results(results_matrix_list, embedding_sizes, layer_indices, out_
 
     colors = ['#8B4513', '#1E90FF', '#228B22', '#FF4500', '#6A5ACD']
     n_layers = len(layer_indices)
-    rows = (n_layers + 2) // 3
     cols = min(3, n_layers)
+    rows = (n_layers + cols - 1) // cols
 
-    fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))
+    fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 4 * rows))
     if n_layers > 1:
         axes = axes.flatten()
     else:
         axes = [axes]
 
+    # 计算每一行的 y 轴范围
+    row_y_limits = []
+    for row in range(rows):
+        min_y, max_y = float('inf'), float('-inf')
+        for col in range(cols):
+            i = row * cols + col
+            if i >= n_layers:
+                continue
+            for results_matrix in results_matrix_list:
+                scores = results_matrix[i]
+                scores = [s for s in scores if not np.isnan(s)]
+                if scores:
+                    min_y = min(min_y, min(scores))
+                    max_y = max(max_y, max(scores))
+        y_range = max_y - min_y
+        if y_range == 0:
+            y_range = 10
+        row_y_limits.append((max(0, min_y - 0.1 * y_range), max_y + 0.1 * y_range))
+
     for i, layer_idx in enumerate(layer_indices):
         ax = axes[i]
+        row = i // cols
+        y_min, y_max = row_y_limits[row]
 
         for j, results_matrix in enumerate(results_matrix_list):
             scores = results_matrix[i]
@@ -118,24 +139,14 @@ def plot_layer_results(results_matrix_list, embedding_sizes, layer_indices, out_
             )
 
         ax.set_title(f"Layer = {layer_idx}", fontsize=12)
-
-        all_scores = [
-            score for results_matrix in results_matrix_list
-            for score in results_matrix[i] if not np.isnan(score)
-        ]
-        max_score = max(all_scores)
-        min_score = min(all_scores)
-        y_range = max_score - min_score
-        if y_range == 0:
-            y_range = 10
-        ax.set_ylim([max(0, min_score - 0.1 * y_range), max_score + 0.1 * y_range])
+        ax.set_ylim([y_min, y_max])
         ax.set_xlim([0, max(embedding_sizes) + 50])
-        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.grid(True, linestyle='--', alpha=0.5)
 
         if i % cols == 0:
-            ax.set_ylabel("Spearman's", fontsize=12)
+            ax.set_ylabel("Spearman's", fontsize=10)
         if i == 0:
-            ax.legend(fontsize=10)
+            ax.legend(fontsize=9)
 
     for i in range(n_layers, len(axes)):
         fig.delaxes(axes[i])
@@ -205,7 +216,7 @@ def main():
         model_names = args.model_names.split(",") if args.model_names else [args.model_name_or_path_list]
     else:
         # model_names = ["WhereIsAI/ese-qwen-0.5b-nli", "Qwen/Qwen1.5-0.5B"]
-        model_names = ["BAAI/bge-base-en-v1.5"]
+        model_names = ["models/github_para_best", "models/github_para_last", "BAAI/bge-base-en-v1.5"]
     model_results_matrix = []
 
     for model_name in model_names:
