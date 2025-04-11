@@ -43,17 +43,17 @@ parser.add_argument('--prompt_template', type=str, default=None,
                          'If you want to specify different prompts for different text columns, please specify it manually.')
 parser.add_argument('--save_dir', type=str, default="train_res",
                     help='Specify save dir, default None')
-parser.add_argument('--seed', type=int, default=42,
+parser.add_argument('--seed', type=int, default=-1,
                     help='Specify random seed, default -1')
-parser.add_argument('--dataset_seed', type=int, default=42,
+parser.add_argument('--dataset_seed', type=int, default=None,
                     help='Specify dataset random seed, default None')
 parser.add_argument('--workers', type=int, default=16,
                     help='Specify dataset workers, default 2')
-parser.add_argument('--cosine_w', type=float, default=0.0,
+parser.add_argument('--cosine_w', type=float, default=1.0,
                     help='Specify weight for cosine loss, default 1.0')
 parser.add_argument('--ibn_w', type=float, default=1.0,
                     help='Specify weight for ibn loss, default 1.0')
-parser.add_argument('--angle_w', type=float, default=0.02,
+parser.add_argument('--angle_w', type=float, default=1.0,
                     help='Specify weight for angle loss, default 1.0')
 parser.add_argument('--angle_tau', type=float, default=20.0,
                     help='Specify angle_tau, default 20.0')
@@ -235,7 +235,7 @@ def main():
                                              "text2": str(obj['sentence2']), 
                                              "label": float(obj.get("score", 0.0)) / 5.0})  # normalize to [0, 1]})
         valid_ds = valid_ds.select_columns(["text1", "text2", "label"])
-        logger.info(f'Test dataset overview {dataset_path}:')
+        logger.info(f'Test dataset overview {args.valid_name_or_path}:')
         print(valid_ds, "\n")   
 
         valid_ds = valid_ds[args.valid_split_name].map(
