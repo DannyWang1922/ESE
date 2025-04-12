@@ -213,7 +213,7 @@ def main():
 
     # 获取模型列表
     if args.model_name_or_path_list:
-        model_names = args.model_names.split(",") if args.model_names else [args.model_name_or_path_list]
+        model_names = args.model_name_or_path_list.split(",")
     else:
         # model_names = ["WhereIsAI/ese-qwen-0.5b-nli", "Qwen/Qwen1.5-0.5B"]
         model_names = ["models/github_para_best", "models/github_para_last", "BAAI/bge-base-en-v1.5"]
