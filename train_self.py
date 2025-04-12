@@ -12,8 +12,8 @@ import torch
 from datasets import load_dataset
 
 from espresso import AnglE, AngleDataTokenizer
-from datasets import interleave_datasets
 from datasets import concatenate_datasets
+import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
@@ -124,6 +124,21 @@ parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
 # configure wandb
 parser.add_argument('--wandb_project', type=str, default="ESE", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
+
+parser.add_argument('--config', type=str, default=None, help='Path to YAML config file.')
+
+# Pre-parse config parameters
+config_args, remaining_argv = parser.parse_known_args()
+
+# If a config file is specified, read and update the parser's default values
+if config_args.config is not None:
+    with open(config_args.config, 'r') as f:
+        config_data = yaml.safe_load(f)
+        for key, value in config_data.items():
+            if any(a.dest == key for a in parser._actions):
+                parser.set_defaults(**{key: value})
+            else:
+                logger.warning(f"Unknown config key `{key}` in config file.")
 
 args = parser.parse_args()
 logger.info(f'Args: {args}')

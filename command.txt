@@ -22,3 +22,21 @@ python eval_ese_sts_bench.py --is_llm 1 --pooling_strategy mean --model_names_or
 
 CUDA_VISIBLE_DEVICES=0 python train_self.py --epochs 10 --batch_size 32 --is_llm 0 --pooling_strategy cls --model_name_or_path BAAI/bge-base-en-v1.5 --apply_ese 0 --save_dir train_res/bge
 CUDA_VISIBLE_DEVICES=0 python train_self.py --epochs 10 --batch_size 32 --is_llm 0 --pooling_strategy cls --model_name_or_path BAAI/bge-base-en-v1.5 --apply_ese 1 --save_dir train_res/bge_ese
+
+For 4090 Training
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_default_para.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_github_para.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_default_para.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_github_para.yaml
+
+For H800 Training
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_default_para.yaml
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_github_para.yaml
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_default_para.yaml
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_github_para.yaml
+
+For 4090 eval
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python run_eval.py
+
+For H800 eval
+CUDA_VISIBLE_DEVICES=0 python run_eval.py
