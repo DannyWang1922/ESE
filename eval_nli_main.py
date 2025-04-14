@@ -22,7 +22,7 @@ import json
 import csv
 from transformers import AutoConfig
 
-# from modeling.transformers_modeling_qwen2 import Qwen2ForCausalLM
+from modeling.self_modeling_qwen2 import Qwen2ForCausalLM
 # from transformers import Qwen2ForCausalLM
 
 # Import SentEval
@@ -135,15 +135,15 @@ def evaluate_layers(layer_indices, args, model, tokenizer, backbone, tasks):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
+    parser.add_argument("--is_llm", type=int, default=1, choices=[0, 1], help="Is it a large language model. Default: 0")
     parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
     parser.add_argument("--layer_index", type=int, default=-1, help="Layer index to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
-    parser.add_argument("--model_name_or_path", type=str, default="Qwen/Qwen1.5-0.5B-Chat", help="Model name or path")
-    # parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path")
-    parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
-    # parser.add_argument("--prompt_template", type=str, default=None)
+    parser.add_argument("--model_name_or_path", type=str, default="WhereIsAI/ese-qwen-0.5b-nli", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Code-Large-V1 
+    # parser.add_argument("--model_name_or_path", type=str, default=, help="Model name or path")
+    # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
+    parser.add_argument("--prompt_template", type=str, default=None)
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
     parser.add_argument("--mode", type=str, choices=['dev', 'test', 'fasttest'], default='test', help="Evaluation mode")
     parser.add_argument("--task_set", type=str, choices=['sts', 'transfer', 'full', 'na'], default='sts', help="Task set")
@@ -162,10 +162,12 @@ def main():
     
     # Initialize model, tokenizer, and Pooler
     if args.is_llm:
-        backbone = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
-        # backbone = Qwen2ForCausalLM.from_pretrained(
-        #     args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+        if "qwen" in args.model_name_or_path.lower():
+            backbone = Qwen2ForCausalLM.from_pretrained(
+                args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+        else:
+            backbone = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
     else:
         backbone = AutoModel.from_pretrained(
             args.model_name_or_path, output_hidden_states=True).to(device)
