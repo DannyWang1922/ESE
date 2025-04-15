@@ -25,7 +25,7 @@ learning_rate: 5e-5
 warmup_steps: 100
 logging_steps: 100
 pooling_strategy: cls
-epochs: 10
+epochs: 5
 save_steps: 1000
 batch_size: 32
 maxlen: 512
