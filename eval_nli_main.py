@@ -37,12 +37,13 @@ def print_table(task_names, scores):
     tb.add_row(scores)
     print(tb)
 
-def save_table_as_csv(task_names, scores, out_dir): 
+def save_table_as_csv(task_names, scores, layer_scores, out_dir): 
     csv_path = os.path.join(out_dir, "main_table.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(task_names)
         writer.writerow(scores)
+        writer.writerow(layer_scores)
 
 def create_batcher(args, model, tokenizer, backbone, layer_index=None, embedding_size=None):
     """Create a generic batcher function to avoid code duplication"""
@@ -135,15 +136,15 @@ def evaluate_layers(layer_indices, args, model, tokenizer, backbone, tasks):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--is_llm", type=int, default=1, choices=[0, 1], help="Is it a large language model. Default: 0")
+    parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
     parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
     parser.add_argument("--layer_index", type=int, default=-1, help="Layer index to evaluate")
+    parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
-    parser.add_argument("--model_name_or_path", type=str, default="WhereIsAI/ese-qwen-0.5b-nli", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Code-Large-V1 
-    # parser.add_argument("--model_name_or_path", type=str, default=, help="Model name or path")
-    # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
+    parser.add_argument("--model_name_or_path", type=str, default="WhereIsAI/UAE-Large-V1", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
     parser.add_argument("--prompt_template", type=str, default=None)
+    # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
     parser.add_argument("--mode", type=str, choices=['dev', 'test', 'fasttest'], default='test', help="Evaluation mode")
     parser.add_argument("--task_set", type=str, choices=['sts', 'transfer', 'full', 'na'], default='sts', help="Task set")
@@ -226,15 +227,15 @@ def main():
 
     # Compute average performance of non-final layers
     print("\n[≺ Avg.] Computing average STS performance of all non-final layers...")
-    layer_indices = list(range(1,n_layers))
+    layer_indices = list(range(n_layers-args.layer_size+1, n_layers))
     sts_tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
     layer_scores = evaluate_layers(layer_indices, args, model, tokenizer, backbone, sts_tasks)
-    pavg = sum(layer_scores) / len(layer_scores)
+    pavg = sum([float(s) for s in layer_scores]) / len(layer_scores)
     scores.append("%.2f" % pavg)
     task_names.append("≺ Avg.")
 
     print_table(task_names, scores)
-    save_table_as_csv(task_names, scores, args.out_dir)
+    save_table_as_csv(task_names, scores, layer_scores, args.out_dir)
 
 if __name__ == "__main__":
     main()
