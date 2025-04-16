@@ -1,10 +1,7 @@
 import subprocess
 import sys
 
-# model_name_or_path  = "models/beg_defult_para"
-model_name_or_path  = "models/uae_default_para"
-# model_name_or_path  = "models/qwen_default_para"
-
+model_name_or_path  = "models/uae_default_para" # models/beg_defualt_para, models/uae_github_para, models/qwen_default_para
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 model_name = model_name_or_path.split("/")[-1]
@@ -38,10 +35,11 @@ if "qwen" in model_name_or_path.lower():
 else:
     is_llm = "0"
     pooling_strategy = "cls"
+    prompt_template = "None"
     cmd_list = [
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --model_name_or_path {best_model} --out_dir {main_out_dir + best_model.split('/')[-1]}",
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --model_name_or_path {last_model} --out_dir {main_out_dir + last_model.split('/')[-1]}",
-        f"python eval_ese_sts_bench.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --model_name_or_path_list {ese_sts_model_list} --out_dir {plot_out_dir}"
+        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path {best_model} --out_dir {main_out_dir + best_model.split('/')[-1]}",
+        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path {last_model} --out_dir {main_out_dir + last_model.split('/')[-1]}",
+        f"python eval_ese_sts_bench.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path_list {ese_sts_model_list} --out_dir {plot_out_dir}"
     ]
 
 for cmd in cmd_list:
