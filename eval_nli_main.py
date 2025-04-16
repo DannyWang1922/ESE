@@ -153,6 +153,12 @@ def main():
     parser.add_argument('--eval_batch_size', type=int, default=256, help="Eavluation batch size")
 
     args = parser.parse_args()
+    
+    # Convert strings "none", "true", "false" to their actual Python types
+    for arg in vars(args):
+        val = getattr(args, arg)
+        if isinstance(val, str) and val.lower() in {"none", "true", "false"}:
+            setattr(args, arg, {"none": None, "true": True, "false": False}[val.lower()])
 
     os.makedirs(args.out_dir, exist_ok=True)  
     with open(os.path.join(args.out_dir, "parser_para.json"), "w") as f:

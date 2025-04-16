@@ -141,6 +141,11 @@ if config_args.config is not None:
                 logger.warning(f"Unknown config key `{key}` in config file.")
 
 args = parser.parse_args()
+# Convert strings "none", "true", "false" to their actual Python types
+for arg in vars(args):
+    val = getattr(args, arg)
+    if isinstance(val, str) and val.lower() in {"none", "true", "false"}:
+        setattr(args, arg, {"none": None, "true": True, "false": False}[val.lower()])
 logger.info(f'Args: {args}')
 
 if args.seed is not None and args.seed > 0:
