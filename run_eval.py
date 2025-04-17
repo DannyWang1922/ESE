@@ -5,8 +5,6 @@ model_name_or_path  = "models/uae_default_para" # models/beg_defualt_para, model
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 model_name = model_name_or_path.split("/")[-1]
-best_model = model_name_or_path + "/best"
-last_model = model_name_or_path + "/last"
 
 # BAAI/bge-base-en-v1.5", "WhereIsAI/UAE-Large-V1", "Qwen/Qwen1.5-0.5B"
 if "bge" in model_name.lower():
@@ -18,28 +16,22 @@ elif "qwen" in model_name.lower():
 else:
     raise ValueError(f"Unknown model name: {model_name}")
 
-ese_sts_model_list = best_model+","+last_model+","+baseline_model
+ese_sts_model_list = model_name_or_path+","+baseline_model
 
-main_out_dir = "evl_res/"+ model_name+ "/main_" + model_name +"_"
+main_out_dir = "evl_res/"+ model_name+ "/main"
 plot_out_dir = "evl_res/"+ model_name+"/plot"
 
-if "qwen" in model_name_or_path.lower():
-    is_llm = "1"
-    pooling_strategy = "mean"
-    prompt_template = "Represent following sentence for general embedding: {text} <|end_of_text|>"
-    cmd_list = [
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path {best_model} --out_dir {main_out_dir + best_model.split('/')[-1]}",
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path {last_model} --out_dir {main_out_dir + last_model.split('/')[-1]}",
-        f"python eval_ese_sts_bench.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --prompt_template {prompt_template} --model_name_or_path_list {ese_sts_model_list} --out_dir {plot_out_dir}"
-    ]
-else:
+if "qwen" not in model_name_or_path.lower():
     is_llm = "0"
     pooling_strategy = "cls"
     prompt_template = "None"
-    cmd_list = [
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path {best_model} --out_dir {main_out_dir + best_model.split('/')[-1]}",
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path {last_model} --out_dir {main_out_dir + last_model.split('/')[-1]}",
-        f"python eval_ese_sts_bench.py --is_llm {is_llm} --pooling_strategy {pooling_strategy} --prompt_template {prompt_template} --model_name_or_path_list {ese_sts_model_list} --out_dir {plot_out_dir}"
+else:
+    is_llm = "1"
+    pooling_strategy = "mean"
+
+cmd_list = [
+        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --model_name_or_path {model_name} --out_dir {main_out_dir}",
+        f"python eval_ese_sts_bench.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --model_name_or_path_list {ese_sts_model_list} --out_dir {plot_out_dir}"
     ]
 
 for cmd in cmd_list:

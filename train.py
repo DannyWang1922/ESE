@@ -6,7 +6,6 @@ import argparse
 import random
 
 import numpy as np
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 import torch
 from datasets import load_dataset
 
@@ -16,13 +15,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_name_or_path', type=str, default="BAAI/bge-base-en-v1.5",
+parser.add_argument('--model_name_or_path', type=str, required=True,
                     help='Specify model name or path to set transformer backbone, required')
 parser.add_argument('--pretrained_model_path', type=str, default=None,
                     help='Specify pretrained model path to load pretrained model, default None')
 parser.add_argument('--pretrained_lora_path', type=str, default=None,
                     help='Specify pretrained lora path to load lora, default None')
-parser.add_argument('--train_name_or_path', type=str, default="nyu-mll/multi_nli",
+parser.add_argument('--train_name_or_path', type=str, required=True,
                     help='Specify huggingface datasets name or local file path for train set, required')
 parser.add_argument('--train_subset_name', type=str, default=None,
                     help='Specify huggingface datasets subset name for train set, default None')
@@ -38,7 +37,7 @@ parser.add_argument('--prompt_template', type=str, default=None,
                     help='Specify prompt_template like "xxx: {text}", default None.'
                          'This prompt will be applied for all text columns.'
                          'If you want to specify different prompts for different text columns, please specify it manually.')
-parser.add_argument('--save_dir', type=str, default="result",
+parser.add_argument('--save_dir', type=str, default=None,
                     help='Specify save dir, default None')
 parser.add_argument('--seed', type=int, default=-1,
                     help='Specify random seed, default -1')
@@ -107,7 +106,7 @@ parser.add_argument('--apply_billm', type=int, default=0, choices=[0, 1],
 parser.add_argument('--billm_model_class', type=str, default=None,
                     help='Specify billm model class name, default None')
 # configure ESE
-parser.add_argument('--apply_ese', type=int, default=1, choices=[0, 1],
+parser.add_argument('--apply_ese', type=int, default=0, choices=[0, 1],
                     help='Specify apply_ese to support Espresso Sentence Embedding training, default 0')
 parser.add_argument('--ese_kl_temperature', type=float, default=1.0,
                     help='Specify KL temperature for ese, default 1.0')
@@ -118,10 +117,9 @@ parser.add_argument('--teacher_name_or_path', type=str, default=None,
                     help='Specify model_name_or_path for teacher alignment, default None')
 parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
-# # configure wandb
-# parser.add_argument('--wandb_project', type=str, default=None, help='Specify WANDB_PROJECT, default None')
-# parser.add_argument('--wandb_log_model', type=str, default=None, help='Specify WANDB_LOG_MODEL, default None')
-
+# configure wandb
+parser.add_argument('--wandb_project', type=str, default=None, help='Specify WANDB_PROJECT, default None')
+parser.add_argument('--wandb_log_model', type=str, default=None, help='Specify WANDB_LOG_MODEL, default None')
 args = parser.parse_args()
 logger.info(f'Args: {args}')
 
@@ -131,14 +129,14 @@ if args.seed is not None and args.seed > 0:
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-# if args.wandb_project is not None:
-#     import wandb
+if args.wandb_project is not None:
+    import wandb
 
-#     logger.info('Set up wandb...')
-#     os.environ['WANDB_PROJECT'] = args.wandb_project
-#     os.environ['WANDB_LOG_MODEL'] = args.wandb_log_model
+    logger.info('Set up wandb...')
+    os.environ['WANDB_PROJECT'] = args.wandb_project
+    os.environ['WANDB_LOG_MODEL'] = args.wandb_log_model
 
-#     wandb.login()
+    wandb.login()
 
 if args.torch_dtype == 'float32':
     args.torch_dtype = torch.float32
@@ -187,8 +185,6 @@ def main():
                           args.train_subset_name,
                           num_proc=args.workers,
                           streaming=args.streaming)
-    ds = ds.map(lambda obj: {"text1": str(obj["premise"]), "text2": str(obj['hypothesis']), "label": obj['label']})
-    ds = ds.select_columns(["text1", "text2", "label"])
 
     logger.info('Dataset overview:')
     print(ds)
@@ -222,8 +218,8 @@ def main():
         argument_kwargs['push_to_hub'] = True
         argument_kwargs['hub_private_repo'] = bool(args.hub_private_repo)
         argument_kwargs['hub_model_id'] = args.hub_model_id
-    # if args.wandb_project is not None:
-    #     argument_kwargs['report_to'] = 'wandb'
+    if args.wandb_project is not None:
+        argument_kwargs['report_to'] = 'wandb'
     if args.max_steps > 0:
         argument_kwargs['max_steps'] = args.max_steps
 

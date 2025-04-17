@@ -1,15 +1,15 @@
-model_name_or_path: WhereIsAI/UAE-Large-V1
+model_name_or_path: google-bert/bert-base-uncased
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
-valid_split_name: train
-save_dir: ./train_result/uae_default_para/uae_ese
-seed: -1
+valid_split_name: test
+save_dir: ./train_result/bert_base_ese
+seed: 42
 workers: 16
 
 # configure Aoe
-cosine_w: 1.0
+cosine_w: 0.0
 ibn_w: 1.0
-angle_w: 1.0
+angle_w: 0.02
 cosine_tau: 20.0
 ibn_tau: 20.0
 angle_tau: 20.0
@@ -25,10 +25,11 @@ learning_rate: 5e-5
 warmup_steps: 100
 logging_steps: 100
 pooling_strategy: cls
-epochs: 5
+epochs: 10
 save_steps: 1000
 batch_size: 32
 maxlen: 512
+dataset_seed: 42
 
 # configure LLM
 is_llm: 0

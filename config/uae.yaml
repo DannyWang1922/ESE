@@ -3,7 +3,7 @@ train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
 valid_split_name: train
 save_dir: ./train_result/uae_github_para/uae_ese
-seed: -1
+seed: 42
 workers: 16
 
 # configure Aoe
@@ -29,6 +29,7 @@ epochs: 5
 save_steps: 1000
 batch_size: 32
 maxlen: 512
+seed: 42
 
 # configure LLM
 is_llm: 0
