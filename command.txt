@@ -29,6 +29,9 @@ NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py
 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_default_para.yaml
 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_github_para.yaml
 
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bert.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1 python train_self.py --config config/bert_ese.yaml
+
 For H800 Training
 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_default_para.yaml
 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_github_para.yaml

@@ -143,6 +143,8 @@ if config_args.config is not None:
 args = parser.parse_args()
 # Convert strings "none", "true", "false" to their actual Python types
 for arg in vars(args):
+    if arg == "wandb_log_model":
+        continue  # ignore wandb_log_model
     val = getattr(args, arg)
     if isinstance(val, str) and val.lower() in {"none", "true", "false"}:
         setattr(args, arg, {"none": None, "true": True, "false": False}[val.lower()])
