@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-model_name_or_path  = "models/uae_default_para" # models/beg_defualt_para, models/uae_github_para, models/qwen_default_para
+model_name_or_path  = "models/bert" # models/beg_defualt_para, models/uae_github_para, models/qwen_default_para
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 model_name = model_name_or_path.split("/")[-1]
@@ -13,6 +13,8 @@ elif "uae" in model_name.lower():
     baseline_model = "WhereIsAI/UAE-Large-V1"
 elif "qwen" in model_name.lower():
     baseline_model = "Qwen/Qwen1.5-0.5B"
+elif "bert" in model_name.lower():
+    baseline_model = "google-bert/bert-base-uncased"
 else:
     raise ValueError(f"Unknown model name: {model_name}")
 
@@ -30,7 +32,7 @@ else:
     pooling_strategy = "mean"
 
 cmd_list = [
-        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --model_name_or_path {model_name} --out_dir {main_out_dir}",
+        f"python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --model_name_or_path {model_name_or_path} --out_dir {main_out_dir}",
         f"python eval_ese_sts_bench.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --model_name_or_path_list {ese_sts_model_list} --out_dir {plot_out_dir}"
     ]
 
@@ -38,7 +40,7 @@ for cmd in cmd_list:
     cmd = nv_cmd + " " + cmd
     print(f"\nRunning cmd: {cmd}\n")
     try:
-        subprocess.run(cmd, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)
+        # subprocess.run(cmd, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)
         print(f"Command Done: {cmd}")
         print("=" * 100)
     except subprocess.CalledProcessError as e:
