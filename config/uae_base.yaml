@@ -1,8 +1,8 @@
-model_name_or_path: google-bert/bert-base-uncased
+model_name_or_path: WhereIsAI/UAE-Large-V1
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
-valid_split_name: test
-save_dir: ./train_result/bert_ese
+valid_split_name: train
+save_dir: ./train_result/uae_base
 seed: 42
 workers: 16
 
@@ -29,13 +29,15 @@ epochs: 2
 save_steps: 1000
 batch_size: 32
 maxlen: 512
-dataset_seed: 42
+seed: 42
 
 # configure LLM
 is_llm: 0
 apply_billm: 0
 
 # configure ESE
-apply_ese: 1
+apply_ese: 0
 ese_compression_size: 128
 ese_kl_temperature: 1.0
+
+

@@ -2,7 +2,7 @@ model_name_or_path: WhereIsAI/UAE-Large-V1
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
 valid_split_name: train
-save_dir: ./train_result/uae_github_para/uae_ese
+save_dir: ./train_result/uae_ese
 seed: 42
 workers: 16
 
@@ -25,7 +25,7 @@ learning_rate: 5e-5
 warmup_steps: 100
 logging_steps: 100
 pooling_strategy: cls
-epochs: 5
+epochs: 2
 save_steps: 1000
 batch_size: 32
 maxlen: 512
