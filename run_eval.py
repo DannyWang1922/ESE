@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-model_name_or_path  = "models/bert" # models/beg_defualt_para, models/uae_github_para, models/qwen_default_para
+model_name_or_path  = "models/bge_base" # models/beg_defualt_para, models/uae_github_para, models/qwen_default_para
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 model_name = model_name_or_path.split("/")[-1]
@@ -20,7 +20,7 @@ else:
 
 ese_sts_model_list = model_name_or_path+","+baseline_model
 
-main_out_dir = "evl_res/"+ model_name+ "/main"
+main_out_dir = "evl_res/"+ model_name
 plot_out_dir = "evl_res/"+ model_name+"/plot"
 
 if "qwen" not in model_name_or_path.lower():
