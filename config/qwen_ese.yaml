@@ -1,8 +1,8 @@
-model_name_or_path: WhereIsAI/UAE-Large-V1
+model_name_or_path: Qwen/Qwen1.5-0.5B
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
-valid_split_name: train
-save_dir: ./train_result/uae_ese
+valid_split_name: test
+save_dir: ./train_result/qwen_ese
 seed: 42
 workers: 16
 

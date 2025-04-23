@@ -1,37 +1,33 @@
 # -*- coding: utf-8 -*-
 
-import json
 import os
 import logging
 import argparse
 import random
 
 import numpy as np
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 import torch
 from datasets import load_dataset
 
 from espresso import AnglE, AngleDataTokenizer
-from datasets import concatenate_datasets
-import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_name_or_path', type=str, default="BAAI/bge-base-en-v1.5",
+parser.add_argument('--model_name_or_path', type=str, required=True,
                     help='Specify model name or path to set transformer backbone, required')
 parser.add_argument('--pretrained_model_path', type=str, default=None,
                     help='Specify pretrained model path to load pretrained model, default None')
 parser.add_argument('--pretrained_lora_path', type=str, default=None,
                     help='Specify pretrained lora path to load lora, default None')
-parser.add_argument('--train_name_or_path', type=str, default=None,
+parser.add_argument('--train_name_or_path', type=str, required=True,
                     help='Specify huggingface datasets name or local file path for train set, required')
 parser.add_argument('--train_subset_name', type=str, default=None,
                     help='Specify huggingface datasets subset name for train set, default None')
 parser.add_argument('--train_split_name', type=str, default='train',
                     help='Specify huggingface datasets split name for train set, default `train`')
-parser.add_argument('--valid_name_or_path', type=str, default="mteb/stsbenchmark-sts",
+parser.add_argument('--valid_name_or_path', type=str, default=None,
                     help='Specify huggingface datasets name or local file path for valid set, default None.')
 parser.add_argument('--valid_subset_name', type=str, default=None,
                     help='Specify huggingface datasets subset name for valid set, default None')
@@ -41,13 +37,13 @@ parser.add_argument('--prompt_template', type=str, default=None,
                     help='Specify prompt_template like "xxx: {text}", default None.'
                          'This prompt will be applied for all text columns.'
                          'If you want to specify different prompts for different text columns, please specify it manually.')
-parser.add_argument('--save_dir', type=str, default="train_res",
+parser.add_argument('--save_dir', type=str, default=None,
                     help='Specify save dir, default None')
 parser.add_argument('--seed', type=int, default=-1,
                     help='Specify random seed, default -1')
 parser.add_argument('--dataset_seed', type=int, default=None,
                     help='Specify dataset random seed, default None')
-parser.add_argument('--workers', type=int, default=16,
+parser.add_argument('--workers', type=int, default=2,
                     help='Specify dataset workers, default 2')
 parser.add_argument('--cosine_w', type=float, default=1.0,
                     help='Specify weight for cosine loss, default 1.0')
@@ -73,7 +69,7 @@ parser.add_argument('--lora_dropout', type=float, default=0.1,
                     help='Specify lora_dropout, defaut 0.1')
 parser.add_argument('--lora_target_modules', type=str, default=None,
                     help='Specify lora_target_modules. comma serves as the splitter, such as `W,b`. Defaut None')
-parser.add_argument('--learning_rate', type=float, default=5e-5,
+parser.add_argument('--learning_rate', type=float, default=1e-5,
                     help='Specify learning_rate, defaut 1e-5')
 parser.add_argument('--warmup_steps', type=int, default=100,
                     help='Specify warmup_steps, defaut 100')
@@ -86,7 +82,7 @@ parser.add_argument('--tokenizer_padding_side', type=str, default=None, choices=
 parser.add_argument('--epochs', type=int, default=10, help='Specify epochs, default 10')
 parser.add_argument('--max_steps', type=int, default=-1,
                     help='Specify max steps, default -1 (Automatically calculated from epochs)')
-parser.add_argument('--save_steps', type=int, default=1000, help='Specify save_steps, default 1000')
+parser.add_argument('--save_steps', type=int, default=100, help='Specify save_steps, default 1000')
 parser.add_argument('--batch_size', type=int, default=32, help='Specify batch size, default 32')
 parser.add_argument('--maxlen', type=int, default=512, help='Specify max length, default 512')
 parser.add_argument('--streaming', action='store_true', default=False,
@@ -110,7 +106,7 @@ parser.add_argument('--apply_billm', type=int, default=0, choices=[0, 1],
 parser.add_argument('--billm_model_class', type=str, default=None,
                     help='Specify billm model class name, default None')
 # configure ESE
-parser.add_argument('--apply_ese', type=int, default=1, choices=[0, 1],
+parser.add_argument('--apply_ese', type=int, default=0, choices=[0, 1],
                     help='Specify apply_ese to support Espresso Sentence Embedding training, default 0')
 parser.add_argument('--ese_kl_temperature', type=float, default=1.0,
                     help='Specify KL temperature for ese, default 1.0')
@@ -122,32 +118,9 @@ parser.add_argument('--teacher_name_or_path', type=str, default=None,
 parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
 # configure wandb
-parser.add_argument('--wandb_project', type=str, default="ESE", help='Specify WANDB_PROJECT, default None')
-parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
-
-parser.add_argument('--config', type=str, default=None, help='Path to YAML config file.')
-
-# Pre-parse config parameters
-config_args, remaining_argv = parser.parse_known_args()
-
-# If a config file is specified, read and update the parser's default values
-if config_args.config is not None:
-    with open(config_args.config, 'r') as f:
-        config_data = yaml.safe_load(f)
-        for key, value in config_data.items():
-            if any(a.dest == key for a in parser._actions):
-                parser.set_defaults(**{key: value})
-            else:
-                logger.warning(f"Unknown config key `{key}` in config file.")
-
+parser.add_argument('--wandb_project', type=str, default=None, help='Specify WANDB_PROJECT, default None')
+parser.add_argument('--wandb_log_model', type=str, default=None, help='Specify WANDB_LOG_MODEL, default None')
 args = parser.parse_args()
-# Convert strings "none", "true", "false" to their actual Python types
-for arg in vars(args):
-    if arg == "wandb_log_model":
-        continue  # ignore wandb_log_model
-    val = getattr(args, arg)
-    if isinstance(val, str) and val.lower() in {"none", "true", "false"}:
-        setattr(args, arg, {"none": None, "true": True, "false": False}[val.lower()])
 logger.info(f'Args: {args}')
 
 if args.seed is not None and args.seed > 0:
@@ -158,6 +131,7 @@ if args.seed is not None and args.seed > 0:
 
 if args.wandb_project is not None:
     import wandb
+
     logger.info('Set up wandb...')
     os.environ['WANDB_PROJECT'] = args.wandb_project
     os.environ['WANDB_LOG_MODEL'] = args.wandb_log_model
@@ -183,9 +157,6 @@ lora_config = {
 if args.lora_target_modules is not None:
     lora_config['target_modules'] = [v.strip() for v in args.lora_target_modules.split(',') if v.strip()]
 
-os.makedirs(args.save_dir, exist_ok=True)
-with open(os.path.join(args.save_dir, "parser_para.json"), "w") as f:
-    json.dump(vars(args), f, indent=4)
 
 def main():
     model = AnglE(args.model_name_or_path,
@@ -204,44 +175,29 @@ def main():
                   apply_billm=args.apply_billm,
                   billm_model_class=args.billm_model_class)
 
-    if args.train_name_or_path is not None:
-        dataset_path_list = [ds for ds in args.train_name_or_path.split(",")]
+    if os.path.exists(args.train_name_or_path):
+        ds = load_dataset('json',
+                          data_files=[args.train_name_or_path],
+                          num_proc=args.workers,
+                          streaming=args.streaming)
     else:
-        dataset_path_list = ["nyu-mll/multi_nli", "stanfordnlp/snli"]
+        ds = load_dataset(args.train_name_or_path,
+                          args.train_subset_name,
+                          num_proc=args.workers,
+                          streaming=args.streaming)
 
-    all_train_datasets = []
-    for dataset_path in dataset_path_list:
-        if os.path.exists(dataset_path):
-            ds = load_dataset('json',
-                            data_files=[dataset_path],
-                            num_proc=args.workers,
-                            streaming=args.streaming)
-        else:
-            ds = load_dataset(dataset_path,
-                            args.train_subset_name,
-                            num_proc=args.workers,
-                            streaming=args.streaming)
-        ds = ds.map(lambda obj: {"text1": str(obj["premise"]), "text2": str(obj["hypothesis"]), "label": obj["label"]})
-        ds = ds.select_columns(["text1", "text2", "label"])
-        logger.info(f'Training dataset overview {dataset_path}:')
-        all_train_datasets.append(ds[args.train_split_name])
-        print(ds)
-    
-    logger.info('All datasets loaded. Concatenating...')
-    if args.streaming:
-        from itertools import chain
-        combined_dataset = all_train_datasets[0]
-        for ds in all_train_datasets[1:]:
-            combined_dataset = combined_dataset.concatenate(ds)
-    else:
-        combined_dataset = concatenate_datasets(all_train_datasets)
-    print("Combined_dataset: \n", combined_dataset)
-
+    logger.info('Dataset overview:')
+    print(ds)
     logger.info('Processing train...')
-    train_ds = combined_dataset.shuffle(args.dataset_seed).map(
-        AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
-        num_proc=args.workers)
-    
+    if args.streaming:
+        train_ds = ds[args.train_split_name].shuffle(args.dataset_seed).map(
+            AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
+            num_proc=args.workers)
+    else:
+        train_ds = ds[args.train_split_name].shuffle(args.dataset_seed).map(
+            AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
+            num_proc=args.workers)
+
     valid_ds = None
     if valid_ds is None and args.valid_name_or_path is not None:
         logger.info('Validation detected, processing validation...')
@@ -252,15 +208,7 @@ def main():
                 valid_ds = load_dataset(args.valid_name_or_path, args.valid_subset_name, num_proc=args.workers)
             else:
                 valid_ds = load_dataset(args.valid_name_or_path, num_proc=args.workers)
-        
-        valid_ds = valid_ds.map(lambda obj: {"text1": str(obj["sentence1"]), 
-                                             "text2": str(obj['sentence2']), 
-                                             "label": float(obj.get("score", 0.0)) / 5.0})  # normalize to [0, 1]})
-        valid_ds = valid_ds.select_columns(["text1", "text2", "label"])
-        logger.info(f'Test dataset overview {args.valid_name_or_path}:')
-        print(valid_ds, "\n")   
-
-        valid_ds = valid_ds[args.valid_split_name].map(
+        valid_ds = valid_ds[args.valid_split_name or 'train'].map(
             AngleDataTokenizer(model.tokenizer, model.max_length, prompt_template=args.prompt_template),
             num_proc=args.workers)
 
@@ -310,10 +258,7 @@ def main():
         fp16=args.fp16,
         argument_kwargs=argument_kwargs,
         apply_ese=args.apply_ese,
-        apply_aoe=args.apply_aoe,
         trainer_kwargs=trainer_kwargs,
-        eval_steps =args.save_steps,
-        save_total_limit = 1,
     )
 
 

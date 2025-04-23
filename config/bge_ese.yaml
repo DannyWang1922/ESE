@@ -1,7 +1,7 @@
 model_name_or_path: BAAI/bge-base-en-v1.5
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
-valid_split_name: train
+valid_split_name: test
 save_dir: ./train_result/beg_ese
 seed: 42
 workers: 16

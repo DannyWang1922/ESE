@@ -22,8 +22,7 @@ import json
 import csv
 from transformers import AutoConfig
 
-from modeling.self_modeling_qwen2 import Qwen2ForCausalLM
-# from transformers import Qwen2ForCausalLM
+from billm import Qwen2ForCausalLM
 
 # Import SentEval
 sys.path.insert(0, './SentEval')
@@ -142,7 +141,7 @@ def main():
     parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
-    parser.add_argument("--model_name_or_path", type=str, default="WhereIsAI/UAE-Large-V1", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
+    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
     parser.add_argument("--prompt_template", type=str, default=None)
     # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")

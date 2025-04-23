@@ -191,8 +191,8 @@ def plot_layer_results(results_matrix_list, embedding_sizes, layer_indices, out_
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--is_llm", type=int, default=1, choices=[0, 1], help="Is it a large language model. Default: 0")
-    parser.add_argument("--pooling_strategy", type=str, default='mean', help="Pooling strategy")
+    parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
+    parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
     parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--model_name_or_path_list", type=str, default=None, help="Comma-separated list of model names or paths")
