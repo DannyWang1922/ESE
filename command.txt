@@ -8,4 +8,41 @@ python eval_nli.py --pooling_strategy mean --model_name_or_path WhereIsAI/ese-qw
 python train.py --model_name_or_path google-bert/bert-base-uncased  --train_name_or_path nyu-mll/multi_nli
 python train.py --model_name_or_path WhereIsAI/UAE-Large-V1  --train_name_or_path nyu-mll/multi_nli
 
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train.py
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_nli_main.py
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_ese_sts_bench.py
+
+
+python eval_nli_main.py --is_llm 0 --pooling_strategy cls --eval_batch_size 64 --model_name_or_path models/bge_ese --out_dir evl_res/main_bge_ese 
+python eval_nli_main.py --is_llm 0 --pooling_strategy cls --eval_batch_size 64 --model_name_or_path models/bge --out_dir evl_res/main_bge 
+python eval_ese_sts_bench.py --is_llm 0 --pooling_strategy --eval_batch_size 64 cls --model_names_or_paths models/bge_ese,models/bge --out_dir evl_res/plot_bge
+
+python eval_nli_main.py --is_llm 1 --pooling_strategy mean --model_name_or_path WhereIsAI/ese-qwen-0.5b-nli --out_dir evl_res/main_qwen_ese
+python eval_nli_main.py --is_llm 1 --pooling_strategy mean --model_name_or_path Qwen/Qwen1.5-0.5B --out_dir evl_res/main_qwen
+python eval_ese_sts_bench.py --is_llm 1 --pooling_strategy mean --model_names_or_paths WhereIsAI/ese-qwen-0.5b-nli,Qwen/Qwen1.5-0.5B --out_dir evl_res/plot_qwen
+
+CUDA_VISIBLE_DEVICES=0 python train_self.py --epochs 10 --batch_size 32 --is_llm 0 --pooling_strategy cls --model_name_or_path BAAI/bge-base-en-v1.5 --apply_ese 0 --save_dir train_res/bge
+CUDA_VISIBLE_DEVICES=0 python train_self.py --epochs 10 --batch_size 32 --is_llm 0 --pooling_strategy cls --model_name_or_path BAAI/bge-base-en-v1.5 --apply_ese 1 --save_dir train_res/bge_ese
+
+For 4090 Training
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_default_para.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_github_para.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_default_para.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_github_para.yaml
+
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bert.yaml
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1 python train_self.py --config config/bert_ese.yaml
+
+For H800 Training
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_default_para.yaml
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/bge_github_para.yaml
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_default_para.yaml
+CUDA_VISIBLE_DEVICES=0 python train_self.py --config config/uae_github_para.yaml
+
+For 4090 eval
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python run_eval.py
+
+For H800 eval
+CUDA_VISIBLE_DEVICES=0 python run_eval.py
+
+pip install PEFT==0.9.0 Transformers==4.39.3 torch==2.0.1 Datasets==2.18.0 Tokenizers==0.15.0
+ Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 

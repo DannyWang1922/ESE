@@ -898,9 +898,9 @@ class AngleESETrainer(AngleTrainer):
                                           padding_strategy)
 
             slimmed_outputs = student_outputs[:, :self.ese_compression_size]
-            loss += self.loss_fct(labels, slimmed_outputs) / division
-            if self.apply_ese_pca:
-                compression_loss += self.distillation_loss(
+            loss += self.loss_fct(labels, slimmed_outputs) / division # equ(2) first part
+            if self.apply_ese_pca: # equ(6) first part
+                compression_loss += self.distillation_loss( # distillation_loss: align(x, y) equ(6)
                     slimmed_outputs,
                     self.pca_compress(student_outputs, self.ese_compression_size),
                     kl_temperature=self.ese_kl_temperature
@@ -922,11 +922,11 @@ class AngleESETrainer(AngleTrainer):
                                       self.pooler.pooling_strategy,
                                       self.pooler.padding_strategy)
 
-        loss = self.loss_fct(labels, teacher_outputs)
+        loss = self.loss_fct(labels, teacher_outputs) # equ(2) last part
 
         slimmed_outputs = teacher_outputs[:, :self.ese_compression_size]
-        loss += self.loss_fct(labels, slimmed_outputs)
-        if self.apply_ese_pca:
+        loss += self.loss_fct(labels, slimmed_outputs)  
+        if self.apply_ese_pca: # equ(6) last part
             loss += self.distillation_loss(
                 slimmed_outputs,
                 self.pca_compress(teacher_outputs, self.ese_compression_size),
