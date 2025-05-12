@@ -9,7 +9,7 @@ cmd_list = [
 for cmd in cmd_list:
     print(f"\nRunning cmd: {cmd}\n")
     try:
-        subprocess.run(cmd, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)
+        # subprocess.run(cmd, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)
         print(f"Command Done: {cmd}")
         print("=" * 100)
     except subprocess.CalledProcessError as e:

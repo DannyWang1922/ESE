@@ -138,7 +138,6 @@ def main():
     parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
     parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
     parser.add_argument("--layer_index", type=int, default=-1, help="Layer index to evaluate")
-    parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
     parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
@@ -232,7 +231,7 @@ def main():
 
     # Compute average performance of non-final layers
     print("\n[≺ Avg.] Computing average STS performance of all non-final layers...")
-    layer_indices = list(range(n_layers-args.layer_size+1, n_layers))
+    layer_indices = list(range(1, n_layers+1))
     sts_tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
     layer_scores = evaluate_layers(layer_indices, args, model, tokenizer, backbone, sts_tasks)
     pavg = sum([float(s) for s in layer_scores]) / len(layer_scores)

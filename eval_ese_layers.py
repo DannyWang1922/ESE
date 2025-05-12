@@ -193,7 +193,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
     parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
-    parser.add_argument("--layer_size", type=int, default=12, help="Number of layers to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--model_name_or_path_list", type=str, default=None, help="Comma-separated list of model names or paths")
     # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
@@ -269,7 +268,7 @@ def main():
 
         # Multi-embedding-size evaluation
         embedding_sizes = [int(x) for x in args.embedding_size_list.split(",")]
-        layer_indices = list(range(n_layers-args.layer_size+1, n_layers+1))
+        layer_indices = list(range(1, n_layers+1))
         tasks = ['STSBenchmark']
 
         results_matrix = []
