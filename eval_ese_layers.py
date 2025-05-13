@@ -22,7 +22,7 @@ import csv
 import matplotlib.pyplot as plt
 from transformers import AutoConfig
 
-from billm import Qwen2ForCausalLM
+# from billm import Qwen2ForCausalLM
 
 # Import SentEval
 sys.path.insert(0, './SentEval')
@@ -233,12 +233,14 @@ def main():
 
         # Initialize model, tokenizer, and Pooler
         if args.is_llm:
-            if "qwen" in model_name.lower():
-                backbone = Qwen2ForCausalLM.from_pretrained(
-                    model_name, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
-            else:
-                backbone = AutoModelForCausalLM.from_pretrained(
-                    model_name, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+            # if "qwen" in model_name.lower():
+            #     backbone = Qwen2ForCausalLM.from_pretrained(
+            #         model_name, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+            # else:
+            #     backbone = AutoModelForCausalLM.from_pretrained(
+            #         model_name, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+            backbone = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
         else:
             backbone = AutoModel.from_pretrained(
                 model_name, output_hidden_states=True).to(device)

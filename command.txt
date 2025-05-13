@@ -13,3 +13,6 @@ eval
 python eval_nli_main.py --is_llm 0 --pooling_strategy cls  --model_name_or_path models/bert_base --out_dir evl_res/bert_base
 python eval_nli_main.py --is_llm 0 --pooling_strategy cls  --model_name_or_path models/bert_base_ese --out_dir evl_res/bert_base
 python eval_ese_layers.py --is_llm 0 --pooling_strategy cls  --model_name_or_path_list models/bert_base_ese,models/bert_base,google-bert/bert-base-uncased --out_dir evl_res/bert_base/plot
+
+
+CUDA_VISIBLE_DEVICES=0 python eval_nli_main.py --is_llm 1 --pooling_strategy mean  --model_name_or_path allenai/OLMoE-1B-7B-0924 --out_dir evl_res/OLMoE-1B-7B-0924
