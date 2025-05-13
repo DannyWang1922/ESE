@@ -58,8 +58,8 @@ def create_batcher(args, model, tokenizer, backbone, layer_index=None, embedding
 
 def get_senteval_params(args):
     """Get standard parameters for SentEval"""
-    params = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10, 'batch_size': 16}
-    params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': args.eval_batch_size, 'tenacity': 5, 'epoch_size': 4}
+    params = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10, 'batch_size': args.batch_size}
+    params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': args.batch_size*4, 'tenacity': 5, 'epoch_size': 4}
     return params
 
 def prepare(params, samples):
@@ -201,7 +201,7 @@ def main():
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
     parser.add_argument('--embedding_size_list', type=str, default="75,150,225,300,375,450,525,600,675,750", help="Comma-separated list of embedding sizes to evaluate")
     parser.add_argument('--out_dir', type=str, default="evl_res/plot", help="Directory to save output files")
-    parser.add_argument('--eval_batch_size', type=int, default=32, help="Eavluation batch size")
+    parser.add_argument('--batch_size', type=int, default=32, help="Eavluation batch size")
 
     args = parser.parse_args()
 
