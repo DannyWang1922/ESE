@@ -161,19 +161,7 @@ if args.wandb_project is not None:
     logger.info('Set up wandb...')
     os.environ['WANDB_PROJECT'] = args.wandb_project
     os.environ['WANDB_LOG_MODEL'] = args.wandb_log_model
-
     wandb.login()
-
-if args.torch_dtype == 'float32':
-    args.torch_dtype = torch.float32
-elif args.torch_dtype == 'float16':
-    args.torch_dtype = torch.float16
-elif args.torch_dtype == 'bfloat16':
-    args.torch_dtype = torch.bfloat16
-
-apply_bfloat16 = None
-if args.torch_dtype == torch.bfloat16:
-    apply_bfloat16 = True
 
 lora_config = {
     'r': args.lora_r,
@@ -186,6 +174,17 @@ if args.lora_target_modules is not None:
 os.makedirs(args.save_dir, exist_ok=True)
 with open(os.path.join(args.save_dir, "parser_para.json"), "w") as f:
     json.dump(vars(args), f, indent=4)
+
+if args.torch_dtype == 'float32':
+    args.torch_dtype = torch.float32
+elif args.torch_dtype == 'float16':
+    args.torch_dtype = torch.float16
+elif args.torch_dtype == 'bfloat16':
+    args.torch_dtype = torch.bfloat16
+
+apply_bfloat16 = None
+if args.torch_dtype == torch.bfloat16:
+    apply_bfloat16 = True
 
 def main():
     model = AnglE(args.model_name_or_path,
@@ -310,7 +309,6 @@ def main():
         fp16=args.fp16,
         argument_kwargs=argument_kwargs,
         apply_ese=args.apply_ese,
-        apply_aoe=args.apply_aoe,
         trainer_kwargs=trainer_kwargs,
         eval_steps =args.save_steps,
         save_total_limit = 1,

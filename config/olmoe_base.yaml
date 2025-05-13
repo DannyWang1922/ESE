@@ -1,0 +1,44 @@
+model_name_or_path: allenai/OLMoE-1B-7B-0924
+train_split_name: train
+valid_name_or_path: mteb/stsbenchmark-sts
+valid_split_name: test
+save_dir: ./train_result/olmoe_base
+seed: 42
+workers: 16
+
+# configure Aoe
+cosine_w: 0.0
+ibn_w: 1.0
+angle_w: 0.02
+cosine_tau: 20.0
+ibn_tau: 20.0
+angle_tau: 20.0
+
+# configure lora
+apply_lora: 1
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.1
+
+# configure training
+learning_rate: 2e-4
+warmup_steps: 100
+logging_steps: 100
+pooling_strategy: mean
+epochs: 2
+save_steps: 1000
+batch_size: 32
+maxlen: 512
+seed: 42
+torch_dtype: bfloat16
+
+# configure LLM
+is_llm: 1
+apply_billm: 0
+
+# configure ESE
+apply_ese: 0
+ese_compression_size: 128
+ese_kl_temperature: 1.0
+
+
