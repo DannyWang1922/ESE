@@ -228,7 +228,6 @@ def main():
     
     logger.info('All datasets loaded. Concatenating...')
     if args.streaming:
-        from itertools import chain
         combined_dataset = all_train_datasets[0]
         for ds in all_train_datasets[1:]:
             combined_dataset = combined_dataset.concatenate(ds)
