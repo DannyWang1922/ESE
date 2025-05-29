@@ -1184,65 +1184,101 @@ class AnglE:
 
         model_kwargs = model_kwargs if model_kwargs is not None else {}
         kbit_kwargs = kbit_kwargs if kbit_kwargs is not None else {}
-        if self.is_llm:
-            device_map = "auto"
-            if apply_billm:
-                assert billm_model_class is not None, "billm_model_class should be specified for apply_billm=True"
-                try:
-                    import billm
-                except ImportError as err:
-                    print(f'Import Error: {err}')
-                    print('Please install the latest billm via: python -m pip install -U billm')
-                    raise
 
-                MODEL_CLASS = getattr(billm, billm_model_class)
-            else:
-                MODEL_CLASS = AutoModelForCausalLM
-            if train_mode and self.gpu_count > 1:
-                device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
-            # LLM
-            if self.apply_lora:
-                lora_config['bias'] = "none"
-                lora_config['task_type'] = TaskType.CAUSAL_LM
+        if kwargs.get('back_bone_model') is not None:
+            self.backbone = kwargs['back_bone_model']
+        else:
+            if self.is_llm:
+                device_map = "auto"
+                if apply_billm:
+                    assert billm_model_class is not None, "billm_model_class should be specified for apply_billm=True"
+                    try:
+                        import billm
+                    except ImportError as err:
+                        print(f'Import Error: {err}')
+                        print('Please install the latest billm via: python -m pip install -U billm')
+                        raise
 
-                if load_kbit in [4, 8]:
-                    model = MODEL_CLASS.from_pretrained(
-                        model_name_or_path,
-                        config=None,
-                        quantization_config=BitsAndBytesConfig(
-                            load_in_4bit=load_kbit == 4,
-                            load_in_8bit=load_kbit == 8,
-                            llm_int8_threshold=6.0,
-                            llm_int8_has_fp16_weight=False,
-                            bnb_4bit_compute_dtype=torch.float32,
-                            bnb_4bit_use_double_quant=True,
-                            bnb_4bit_quant_type='nf4',
-                        ),
-                        torch_dtype=torch.float32,
-                        device_map=device_map,
-                        trust_remote_code=True,
-                    )
-                    if train_mode:
-                        model = prepare_model_for_kbit_training(model, **kbit_kwargs)
-                    if pretrained_lora_path is not None:
-                        print(f'Load lora weight from {pretrained_lora_path}')
-                        model = PeftModel.from_pretrained(
-                            model,
-                            pretrained_lora_path,
+                    MODEL_CLASS = getattr(billm, billm_model_class)
+                else:
+                    MODEL_CLASS = AutoModelForCausalLM
+                if train_mode and self.gpu_count > 1:
+                    device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
+                # LLM
+                if self.apply_lora:
+                    lora_config['bias'] = "none"
+                    lora_config['task_type'] = TaskType.CAUSAL_LM
+
+                    if load_kbit in [4, 8]:
+                        model = MODEL_CLASS.from_pretrained(
+                            model_name_or_path,
+                            config=None,
+                            quantization_config=BitsAndBytesConfig(
+                                load_in_4bit=load_kbit == 4,
+                                load_in_8bit=load_kbit == 8,
+                                llm_int8_threshold=6.0,
+                                llm_int8_has_fp16_weight=False,
+                                bnb_4bit_compute_dtype=torch.float32,
+                                bnb_4bit_use_double_quant=True,
+                                bnb_4bit_quant_type='nf4',
+                            ),
                             torch_dtype=torch.float32,
                             device_map=device_map,
-                            is_trainable=train_mode
+                            trust_remote_code=True,
                         )
-                    elif train_mode:
+                        if train_mode:
+                            model = prepare_model_for_kbit_training(model, **kbit_kwargs)
+                        if pretrained_lora_path is not None:
+                            print(f'Load lora weight from {pretrained_lora_path}')
+                            model = PeftModel.from_pretrained(
+                                model,
+                                pretrained_lora_path,
+                                torch_dtype=torch.float32,
+                                device_map=device_map,
+                                is_trainable=train_mode
+                            )
+                        elif train_mode:
+                            if 'target_modules' not in lora_config or lora_config.get('target_modules', None) is None:
+                                target_modules = find_all_linear_names(
+                                    model, linear_type=bnb.nn.Linear4bit if load_kbit == 4 else nn.Linear)
+                                lora_config['target_modules'] = target_modules
+                                logger.info(f'lora target modules={target_modules}')
+                            peft_config = LoraConfig(**lora_config)
+                            model = get_peft_model(model, peft_config)
+                        model = AnglE.kbit_post_handle(model)
+                        self.backbone = model
+                    else:
+                        if self.apply_bfloat16:
+                            model = MODEL_CLASS.from_pretrained(model_name_or_path,
+                                                                output_hidden_states=True,
+                                                                trust_remote_code=True).bfloat16()
+                        else:
+                            model = MODEL_CLASS.from_pretrained(model_name_or_path,
+                                                                device_map=device_map,
+                                                                output_hidden_states=True,
+                                                                trust_remote_code=True,
+                                                                torch_dtype=torch_dtype or torch.float16)
+
                         if 'target_modules' not in lora_config or lora_config.get('target_modules', None) is None:
-                            target_modules = find_all_linear_names(
-                                model, linear_type=bnb.nn.Linear4bit if load_kbit == 4 else nn.Linear)
+                            target_modules = find_all_linear_names(model)
                             lora_config['target_modules'] = target_modules
                             logger.info(f'lora target modules={target_modules}')
-                        peft_config = LoraConfig(**lora_config)
-                        model = get_peft_model(model, peft_config)
-                    model = AnglE.kbit_post_handle(model)
-                    self.backbone = model
+
+                        if pretrained_lora_path is not None:
+                            print(f'Load lora weight from {pretrained_lora_path}')
+                            model = PeftModel.from_pretrained(
+                                model,
+                                pretrained_lora_path,
+                                torch_dtype=torch.float16 if load_kbit == 16 else torch.float32,
+                                device_map=device_map,
+                                is_trainable=train_mode
+                            )
+                        else:
+                            if train_mode:
+                                peft_config = LoraConfig(**lora_config)
+                                model = get_peft_model(model, peft_config)
+
+                        self.backbone = model
                 else:
                     if self.apply_bfloat16:
                         model = MODEL_CLASS.from_pretrained(model_name_or_path,
@@ -1254,64 +1290,32 @@ class AnglE:
                                                             output_hidden_states=True,
                                                             trust_remote_code=True,
                                                             torch_dtype=torch_dtype or torch.float16)
-
-                    if 'target_modules' not in lora_config or lora_config.get('target_modules', None) is None:
-                        target_modules = find_all_linear_names(model)
-                        lora_config['target_modules'] = target_modules
-                        logger.info(f'lora target modules={target_modules}')
-
+                    self.backbone = model
+            else:
+                # non-LLMs
+                if self.apply_lora:
+                    model = AutoModel.from_pretrained(pretrained_model_path or model_name_or_path, trust_remote_code=True)
                     if pretrained_lora_path is not None:
-                        print(f'Load lora weight from {pretrained_lora_path}')
                         model = PeftModel.from_pretrained(
                             model,
                             pretrained_lora_path,
-                            torch_dtype=torch.float16 if load_kbit == 16 else torch.float32,
-                            device_map=device_map,
                             is_trainable=train_mode
                         )
                     else:
-                        if train_mode:
-                            peft_config = LoraConfig(**lora_config)
-                            model = get_peft_model(model, peft_config)
-
+                        if 'target_modules' not in lora_config or lora_config.get('target_modules', None) is None:
+                            target_modules = find_all_linear_names(model)
+                            lora_config['target_modules'] = target_modules
+                            logger.info(f'lora target modules={target_modules}')
+                        peft_config = LoraConfig(**lora_config)
+                        model = get_peft_model(model, peft_config)
                     self.backbone = model
-            else:
-                if self.apply_bfloat16:
-                    model = MODEL_CLASS.from_pretrained(model_name_or_path,
-                                                        output_hidden_states=True,
-                                                        trust_remote_code=True).bfloat16()
                 else:
-                    model = MODEL_CLASS.from_pretrained(model_name_or_path,
-                                                        device_map=device_map,
-                                                        output_hidden_states=True,
-                                                        trust_remote_code=True,
-                                                        torch_dtype=torch_dtype or torch.float16)
-                self.backbone = model
-        else:
-            # non-LLMs
-            if self.apply_lora:
-                model = AutoModel.from_pretrained(pretrained_model_path or model_name_or_path, trust_remote_code=True)
-                if pretrained_lora_path is not None:
-                    model = PeftModel.from_pretrained(
-                        model,
-                        pretrained_lora_path,
-                        is_trainable=train_mode
-                    )
-                else:
-                    if 'target_modules' not in lora_config or lora_config.get('target_modules', None) is None:
-                        target_modules = find_all_linear_names(model)
-                        lora_config['target_modules'] = target_modules
-                        logger.info(f'lora target modules={target_modules}')
-                    peft_config = LoraConfig(**lora_config)
-                    model = get_peft_model(model, peft_config)
-                self.backbone = model
-            else:
-                if pretrained_model_path is not None:
-                    logger.info(f'Load pretrained model from {pretrained_model_path}')
-                self.backbone = AutoModel.from_pretrained(
-                    pretrained_model_path or model_name_or_path,
-                    trust_remote_code=True,
-                    torch_dtype=torch_dtype or "auto")
+                    if pretrained_model_path is not None:
+                        logger.info(f'Load pretrained model from {pretrained_model_path}')
+                    self.backbone = AutoModel.from_pretrained(
+                        pretrained_model_path or model_name_or_path,
+                        trust_remote_code=True,
+                        torch_dtype=torch_dtype or "auto")
 
         if train_mode and self.apply_lora:
             self.backbone.print_trainable_parameters()
@@ -1420,9 +1424,25 @@ class AnglE:
         with open(fpath, 'r', encoding='utf-8') as reader:
             return json.load(reader)
 
+    # def save_config(self, fpath: str):
+    #     with open(fpath, 'w', encoding='utf-8') as writer:
+    #         json.dump(self.__cfg, writer, ensure_ascii=False, indent=2)
+    
     def save_config(self, fpath: str):
+        def make_serializable(d):
+            result = {}
+            for k, v in d.items():
+                try:
+                    json.dumps(v)
+                    result[k] = v
+                except TypeError:
+                    result[k] = str(v.__class__.__name__)
+            return result
+
+        serializable_cfg = make_serializable(self.__cfg)
+
         with open(fpath, 'w', encoding='utf-8') as writer:
-            json.dump(self.__cfg, writer, ensure_ascii=False, indent=2)
+            json.dump(serializable_cfg, writer, ensure_ascii=False, indent=2)
 
     def detect_dataset_format(self, ds: Dataset):
         for obj in ds:
