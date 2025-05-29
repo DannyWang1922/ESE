@@ -103,7 +103,7 @@ parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
                     help='Specify gradient_accumulation_steps, default 1')
 parser.add_argument('--torch_dtype', type=str, default=None, choices=['auto', 'float32', 'float16', 'bfloat16'],
                     help='Specify torch_dtype from [`auto`, `float32`, `float16`, `bfloat16`], default None')
-parser.add_argument('--fp16', type=bool, default=None, choices=[0, 1],
+parser.add_argument('--fp16', type=int, default=None, choices=[0, 1],
                     help='Specify fp16, choices [0, 1], default None')
 parser.add_argument('--push_to_hub', type=int, default=0, choices=[0, 1], help='Specify push_to_hub, default 0')
 parser.add_argument('--hub_private_repo', type=int, default=1, choices=[0, 1],
@@ -133,7 +133,7 @@ parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
 parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
-parser.add_argument('--config', type=str, default=None, help='Path to YAML config file.')
+parser.add_argument('--config', type=str, default="config/bert_moe_base_11.yaml", help='Path to YAML config file.')
 
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],
@@ -158,7 +158,7 @@ parser.add_argument('--router_aux_loss_coef', type=float, default=0.01,
                     help='Coefficient for router auxiliary loss, default 0.01')
 parser.add_argument('--track_expert_metrics', type=bool, default=True,
                     help='Whether to track expert metrics, default True')
-parser.add_argument('--moe_layers', type=str, default='all',
+parser.add_argument('--moe_layers', type=str, default='[11]',
                     help='Which layers to use MoE. Options: "all" or list like "[0,2,4,6]"')
 parser.add_argument('--expert_init_strategy', type=str, default='diverse',
                     help='Expert initialization strategy, default diverse')
@@ -166,9 +166,9 @@ parser.add_argument('--parallel_expert_computation', type=bool, default=False,
                     help='Whether to parallelize expert computation, default False')
 
 # Add data loading amount argument
-parser.add_argument('--max_train_samples', type=int, default=10000,
+parser.add_argument('--max_train_samples', type=str, default="10000",
                     help='Maximum number of training samples to load. If None, load all data. Default None')
-parser.add_argument('--max_valid_samples', type=int, default=None,
+parser.add_argument('--max_valid_samples', type=str, default=None,
                     help='Maximum number of validation samples to load. If None, load all data. Default None')
 
 # Pre-parse config parameters
@@ -232,6 +232,7 @@ if args.torch_dtype == torch.bfloat16:
 
 def process_moe_layers_arg(moe_layers_str):
     """Process the moe_layers argument into a format the model can use."""
+    moe_layers_str = str(moe_layers_str)
     if moe_layers_str == 'all':
         return 'all'
     else:
@@ -292,6 +293,7 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
         
         # Apply max_train_samples limit if specified (before map operations)
         if args.max_train_samples is not None and not args.streaming:
+            args.max_train_samples = int(args.max_train_samples)
             original_size = len(ds_split)
             ds_split = ds_split.select(range(min(args.max_train_samples, original_size)))
             logger.info(f'Limited {dataset_path} from {original_size} to {len(ds_split)} samples')
@@ -371,6 +373,8 @@ def main():
     if args.use_bert_moe:
         # Load BertMoE model
         back_bone_model = load_bert_moe_model(args)
+        if args.torch_dtype == 'bfloat16':
+            back_bone_model = back_bone_model.to(dtype=torch.bfloat16)
         total_params = sum(p.numel() for p in back_bone_model.parameters())
         print(f"Total number of parameters: {total_params}")
 
