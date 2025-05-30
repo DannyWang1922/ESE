@@ -43,4 +43,4 @@ ese_kl_temperature: 1.0
 # configure MoE
 use_bert_moe: 1
 moe_layers: all
-max_train_samples: 300000
+max_train_samples: 100000
