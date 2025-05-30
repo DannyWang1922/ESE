@@ -21,6 +21,7 @@ from espresso import Pooler
 import json
 import csv
 from transformers import AutoConfig
+from modeling.modeling_bert_moe import BertMoEModel
 
 # from billm import Qwen2ForCausalLM
 
@@ -149,6 +150,7 @@ def main():
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
     parser.add_argument('--out_dir', type=str, default="evl_res/main", help="Directory to save output files")
     parser.add_argument('--batch_size', type=int, default=256, help="Eavluation batch size")
+    parser.add_argument('--is_moe', type=int, default=1, help="Eavluation batch size")
 
     args = parser.parse_args()
     
@@ -166,27 +168,26 @@ def main():
     print("Using device:", device)
     
     # Initialize model, tokenizer, and Pooler
-    if args.is_llm:
-        # if "qwen" in args.model_name_or_path.lower():
-        #     backbone = Qwen2ForCausalLM.from_pretrained(
-        #         args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
-        # else:
-        #     backbone = AutoModelForCausalLM.from_pretrained(
-        #         args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
-            
-        backbone = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+    if args.is_moe:
+        backbone = BertMoEModel.from_pretrained(
+                args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+        tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
     else:
-        backbone = AutoModel.from_pretrained(
-            args.model_name_or_path, output_hidden_states=True).to(device)
+        if args.is_llm:            
+            backbone = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+        else:
+            backbone = AutoModel.from_pretrained(
+                args.model_name_or_path, output_hidden_states=True).to(device)
 
-    if args.is_llm and args.lora_weight:
-        backbone = PeftModel.from_pretrained(
-            backbone, args.lora_weight, torch_dtype=torch.float16, device_map='auto',)
-        backbone.print_trainable_parameters()
+        if args.is_llm and args.lora_weight:
+            backbone = PeftModel.from_pretrained(
+                backbone, args.lora_weight, torch_dtype=torch.float16, device_map='auto',)
+            backbone.print_trainable_parameters()
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     model = Pooler(backbone, pooling_strategy=args.pooling_strategy)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    
     
     # Get number of model layers
     if hasattr(backbone, 'encoder') and hasattr(backbone.encoder, 'layer'):
