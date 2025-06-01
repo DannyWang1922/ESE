@@ -1066,13 +1066,19 @@ class EvaluateCallback(TrainerCallback):
 
     def on_epoch_end(self, args, state, control, **kwargs):
         corrcoef, accuracy = self.evaluate_fn(self.valid_ds)
+        log_message = f'corrcoef: {corrcoef}, accuracy: {accuracy}, best corrcoef: {self.best_corrcoef}'
         if corrcoef > self.best_corrcoef:
             self.best_corrcoef = corrcoef
             print('new best corrcoef!')
             if self.save_dir is not None:
                 self.model.save_pretrained(self.save_dir)
                 print(f'save to {self.save_dir}')
-        print(f'corrcoef: {corrcoef}, accuracy: {accuracy}, best corrcoef: {self.best_corrcoef}')
+        print(log_message)
+
+        if self.save_dir is not None:
+            log_path = os.path.join(self.save_dir, "log.txt")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(log_message + "\n")
 
 
 class AnglE:
