@@ -369,7 +369,7 @@ def load_and_process_valid_data(args, tokenizer, max_length, prompt_template=Non
 
 
 def main():
-    model = None
+    back_bone_model = None
     if args.use_bert_moe:
         # Load BertMoE model
         back_bone_model = load_bert_moe_model(args)

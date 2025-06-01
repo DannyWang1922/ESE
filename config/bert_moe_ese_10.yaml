@@ -2,7 +2,7 @@ model_name_or_path: google-bert/bert-base-uncased
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
 valid_split_name: test
-save_dir: ./train_result/bert_moe_base_11
+save_dir: ./train_result/bert_moe_ese_10
 seed: 42
 workers: 16
 
@@ -25,7 +25,7 @@ learning_rate: 5e-5
 warmup_steps: 100
 logging_steps: 100
 pooling_strategy: cls
-epochs: 5
+epochs: 10
 save_steps: 1000
 batch_size: 16
 maxlen: 512
@@ -36,11 +36,11 @@ is_llm: 0
 apply_billm: 0
 
 # configure ESE
-apply_ese: 0
+apply_ese: 1
 ese_compression_size: 128
 ese_kl_temperature: 1.0
 
 # configure MoE
 use_bert_moe: 1
-moe_layers: [11]
+moe_layers: [10]
 max_train_samples: 50000

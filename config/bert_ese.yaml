@@ -25,9 +25,9 @@ learning_rate: 5e-5
 warmup_steps: 100
 logging_steps: 100
 pooling_strategy: cls
-epochs: 2
+epochs: 10
 save_steps: 1000
-batch_size: 32
+batch_size: 16
 maxlen: 512
 dataset_seed: 42
 
@@ -39,3 +39,6 @@ apply_billm: 0
 apply_ese: 1
 ese_compression_size: 128
 ese_kl_temperature: 1.0
+
+use_bert_moe: 0
+max_train_samples: 50000
