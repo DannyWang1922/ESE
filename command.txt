@@ -30,4 +30,5 @@ NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_nli_main
 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_nli_main.py --is_llm 0 --pooling_strategy cls  --batch_size 256 --model_name_or_path train_result/bert_moe_base_11/best-checkpoint --out_dir evl_res/bert_moe_base_11
 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_nli_main.py --is_llm 0 --pooling_strategy cls  --batch_size 256 --model_name_or_path train_result/bert_moe_base_all/best-checkpoint --out_dir evl_res/bert_moe_base_all
 
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python eval_nli_main.py --is_llm 0 --pooling_strategy cls  --batch_size 256 --model_name_or_path train_result/bert_moe_base_11_4/best-checkpoint --out_dir evl_res/bert_moe_base_11_4
 CUDA_VISIBLE_DEVICES=0 python eval_ese_layers.py --is_llm 0 --pooling_strategy cls  --batch_size 256 --model_name_or_path_list train_result/bert_moe_ese_11/best-checkpoint,train_result/bert_moe_ese_all/best-checkpoint,train_result/bert_moe_base_11/best-checkpoint,train_result/bert_moe_base_all/best-checkpoint --out_dir evl_res/bert_ese_base/plot

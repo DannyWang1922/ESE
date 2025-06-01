@@ -138,7 +138,7 @@ parser.add_argument('--config', type=str, default="config/bert_moe_base_11.yaml"
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],
                     help='Whether to use BertMoE model instead of the model specified in model_name_or_path, default 0')
-parser.add_argument('--num_experts', type=int, default=8,
+parser.add_argument('--num_experts', type=int, default=4,
                     help='Number of experts in MoE, default 8')
 parser.add_argument('--top_k', type=int, default=2,
                     help='Number of experts to select for each token, default 2')
