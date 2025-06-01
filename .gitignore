@@ -11,3 +11,4 @@ wandb/
 .DS_Store
 .idea/
 test.py
+train_result/

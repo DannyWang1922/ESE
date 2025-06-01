@@ -376,7 +376,8 @@ def main():
         if args.torch_dtype == 'bfloat16':
             back_bone_model = back_bone_model.to(dtype=torch.bfloat16)
         total_params = sum(p.numel() for p in back_bone_model.parameters())
-        print(f"Total number of parameters: {total_params}")
+        total_params_in_millions = total_params / 1e6
+        print(f"Total number of parameters: {total_params_in_millions:.2f}M")
 
     model = AnglE(args.model_name_or_path,
                   max_length=args.maxlen,
