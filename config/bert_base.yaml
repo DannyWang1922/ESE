@@ -23,10 +23,10 @@ lora_dropout: 0.1
 # configure training
 learning_rate: 5e-5
 warmup_steps: 100
-logging_steps: 100
+logging_steps: 500
 pooling_strategy: cls
 epochs: 10
-save_steps: 1000
+save_steps: 500
 batch_size: 16
 maxlen: 512
 dataset_seed: 42
