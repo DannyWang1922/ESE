@@ -1076,7 +1076,7 @@ class EvaluateCallback(TrainerCallback):
         print(log_message)
 
         if self.save_dir is not None:
-            log_path = os.path.join(self.save_dir, "log.txt")
+            log_path = os.path.join(os.path.dirname(self.save_dir), "log.txt")
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_message + "\n")
 
