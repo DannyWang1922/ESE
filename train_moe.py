@@ -133,7 +133,7 @@ parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
 parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
-parser.add_argument('--config', type=str, default="config/bert_moe_base_11.yaml", help='Path to YAML config file.')
+parser.add_argument('--config', type=str, default="config/bert_moe_base_10.yaml", help='Path to YAML config file.')
 
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],

@@ -1076,10 +1076,25 @@ class EvaluateCallback(TrainerCallback):
         print(log_message)
 
         if self.save_dir is not None:
-            log_path = os.path.join(os.path.dirname(self.save_dir), "log.txt")
+            log_path = os.path.join(os.path.dirname(self.save_dir), "training_log.txt")
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_message + "\n")
+        
+        if hasattr(self.model.encoder, "expert_metrics"):
+            log_path = os.path.join(os.path.dirname(self.save_dir), "expert_utilization_log.txt")
+            expert_metrics = self.model.encoder.expert_metrics
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write("Expert Utilization Metrics\n")
+                f.write("===========================================================================\n\n")
 
+                if "moe_layers_used" in expert_metrics:
+                    f.write(f"MoE layers used: {expert_metrics['moe_layers_used']}\n")
+                    print(f"MoE layers used: {expert_metrics['moe_layers_used']}")
+
+                for key, value in expert_metrics.items():
+                    if key != "moe_layers_used":
+                        print(f"{key}: {value}")
+                        f.write(f"{key}: {value}\n")
 
 class AnglE:
     """

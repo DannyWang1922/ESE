@@ -1,6 +1,7 @@
 """PyTorch BERT model."""
 
 import math
+import os
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -786,7 +787,7 @@ class BertMoEEncoder(nn.Module):
                 self.expert_metrics["expert_load_balance"] = torch.std(utilization) / torch.mean(utilization)
             else:
                 self.expert_metrics["expert_load_balance"] = torch.tensor(0.0, device=hidden_states.device)
-
+            
         if not return_dict:
             return tuple(
                 v
