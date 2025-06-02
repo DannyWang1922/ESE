@@ -206,6 +206,8 @@ if args.wandb_project is not None:
     os.environ['WANDB_PROJECT'] = args.wandb_project
     os.environ['WANDB_LOG_MODEL'] = args.wandb_log_model
     wandb.login()
+else:
+    os.environ["WANDB_MODE"] = "disabled"
 
 lora_config = {
     'r': args.lora_r,
@@ -355,7 +357,7 @@ def load_and_process_valid_data(args, tokenizer, max_length, prompt_template=Non
     # Now apply the map operations
     valid_ds_split = valid_ds_split.map(lambda obj: {"text1": str(obj["sentence1"]), 
                                          "text2": str(obj['sentence2']), 
-                                         "label": float(obj.get("score", 0.0)) / 5.0})  # normalize to [0, 1]
+                                         "label": float(obj.get("score", 0.0))})  # normalize to [0, 1]
     valid_ds_split = valid_ds_split.select_columns(["text1", "text2", "label"])
     
     logger.info(f'Test dataset overview {args.valid_name_or_path}:')
