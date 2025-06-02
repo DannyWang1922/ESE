@@ -168,10 +168,10 @@ def main():
     print("Using device:", device)
     
     # Initialize model, tokenizer, and Pooler
+    tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
     if args.is_moe:
         backbone = BertMoEModel.from_pretrained(
                 args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
-        tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
     else:
         if args.is_llm:            
             backbone = AutoModelForCausalLM.from_pretrained(
@@ -184,7 +184,6 @@ def main():
             backbone = PeftModel.from_pretrained(
                 backbone, args.lora_weight, torch_dtype=torch.float16, device_map='auto',)
             backbone.print_trainable_parameters()
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     model = Pooler(backbone, pooling_strategy=args.pooling_strategy)
     
