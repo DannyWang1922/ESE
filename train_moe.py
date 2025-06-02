@@ -130,10 +130,10 @@ parser.add_argument('--teacher_name_or_path', type=str, default=None,
 parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
 # configure wandb
-parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
+parser.add_argument('--wandb_project', type=str, default="ESE_MoE_v1.0", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
-parser.add_argument('--config', type=str, default="config/bert_moe_base_10.yaml", help='Path to YAML config file.')
+parser.add_argument('--config', type=str, default="config/bge_moe_base_all.yaml", help='Path to YAML config file.')
 
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],
