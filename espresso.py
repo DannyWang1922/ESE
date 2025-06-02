@@ -1084,17 +1084,30 @@ class EvaluateCallback(TrainerCallback):
             log_path = os.path.join(os.path.dirname(self.save_dir), "expert_utilization_log.txt")
             expert_metrics = self.model.encoder.expert_metrics
             with open(log_path, "a", encoding="utf-8") as f:
-                f.write("Expert Utilization Metrics\n")
-                f.write("===========================================================================\n\n")
-
+                # Print and save MoE layer indices
                 if "moe_layers_used" in expert_metrics:
-                    f.write(f"MoE layers used: {expert_metrics['moe_layers_used']}\n")
-                    print(f"MoE layers used: {expert_metrics['moe_layers_used']}")
+                    moe_layers = expert_metrics["moe_layers_used"]
+                    f.write(f"MoE layers used: {moe_layers}\n")
+            
+                # Save per-layer expert utilization
+                if "per_layer_utilization" in expert_metrics:
+                    f.write("\nPer-layer Expert Utilization:\n")
+                    for layer_idx, util_tensor in expert_metrics["per_layer_utilization"]:
+                        util_list = util_tensor.tolist()
+                        f.write(f"  Layer {layer_idx}: {util_list}\n")
 
-                for key, value in expert_metrics.items():
-                    if key != "moe_layers_used":
-                        print(f"{key}: {value}")
-                        f.write(f"{key}: {value}\n")
+                # Save averaged expert utilization
+                if "expert_utilization" in expert_metrics and expert_metrics["expert_utilization"] is not None:
+                    avg_util = expert_metrics["expert_utilization"].tolist()
+                    f.write(f"\nAverage Expert Utilization (across MoE layers):\n  {avg_util}\n")
+
+                # Save expert load balance score
+                if "expert_load_balance" in expert_metrics:
+                    balance = expert_metrics["expert_load_balance"]
+                    balance_val = balance.item() if isinstance(balance, torch.Tensor) else balance
+                    f.write(f"\nExpert Load Balance (std/mean): {balance_val:.4f}\n")
+                
+                f.write("=" * 100+"\n\n")
 
 class AnglE:
     """

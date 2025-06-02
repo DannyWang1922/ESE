@@ -686,7 +686,8 @@ class BertMoEEncoder(nn.Module):
         if self.track_expert_metrics:
             # Initialize metrics storage (will be updated during forward pass)
             self.expert_metrics = {
-                "expert_utilization": torch.zeros(self.num_experts),
+                "per_layer_utilization": [],
+                "expert_utilization": None,
                 "expert_load_balance": 0.0,
                 "moe_layers_used": list(self.moe_layer_indices),
             }
@@ -710,10 +711,9 @@ class BertMoEEncoder(nn.Module):
         
 		# For load balancing and tracking (modify 1)
         if self.track_expert_metrics:
-            # Reset expert utilization counters
-            self.expert_metrics["expert_utilization"] = torch.zeros(self.num_experts, 
-                                                                   device=hidden_states.device)
-            # Count number of MoE layers actually used
+            self.expert_metrics["per_layer_utilization"] = []
+            self.expert_metrics["expert_utilization"] = None
+            self.expert_metrics["expert_load_balance"] = 0.0
             moe_layers_count = 0
             
         if self.gradient_checkpointing and self.training:
@@ -760,9 +760,8 @@ class BertMoEEncoder(nn.Module):
                 if self.track_expert_metrics and i in self.moe_layer_indices:
                     moe_layers_count += 1
                     if hasattr(layer_module, "expert_metrics"):
-                        self.expert_metrics["expert_utilization"] += layer_module.expert_metrics.get(
-                            "expert_utilization", torch.zeros(self.num_experts, device=hidden_states.device)
-                        )
+                        layer_util = layer_module.expert_metrics.get("expert_utilization")
+                        self.expert_metrics["per_layer_utilization"].append((i, layer_util.detach().clone()))
 
             hidden_states = layer_outputs[0]
             if use_cache:
@@ -778,13 +777,16 @@ class BertMoEEncoder(nn.Module):
             
         # Calculate final expert utilization metrics across all MoE layers
         if self.track_expert_metrics and moe_layers_count > 0:
-            # Normalize by number of MoE layers for average utilization
-            self.expert_metrics["expert_utilization"] /= moe_layers_count
+            # Stack per-layer expert utilizations: shape [num_layers, num_experts]
+            all_utils = torch.stack([util for _, util in self.expert_metrics["per_layer_utilization"]])  # shape: (L, E)
             
-            # Calculate load balance as coefficient of variation (standard deviation / mean)
-            utilization = self.expert_metrics["expert_utilization"]
-            if torch.mean(utilization) > 0:
-                self.expert_metrics["expert_load_balance"] = torch.std(utilization) / torch.mean(utilization)
+            # Average over layers
+            avg_util = all_utils.mean(dim=0)  # shape: (E,)
+            self.expert_metrics["expert_utilization"] = avg_util  # Replace list with avg
+            
+            # Load balance as coefficient of variation
+            if torch.mean(avg_util) > 0:
+                self.expert_metrics["expert_load_balance"] = torch.std(avg_util) / torch.mean(avg_util)
             else:
                 self.expert_metrics["expert_load_balance"] = torch.tensor(0.0, device=hidden_states.device)
             
