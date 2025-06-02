@@ -157,10 +157,10 @@ class BertMoEExpertPool(nn.Module):
         # Get the expert
         expert = self.experts[expert_idx]
         
-        # Apply expert dropout during training (randomly disable experts)
-        if self.training and self.expert_dropout > 0 and torch.rand(1).item() < self.expert_dropout:
-            # If expert is dropped, return zeros or the input (here we choose zeros)
-            return torch.zeros_like(hidden_states)
+        # # Apply expert dropout during training (randomly disable experts)
+        # if self.training and self.expert_dropout > 0 and torch.rand(1).item() < self.expert_dropout:
+        #     # If expert is dropped, return zeros or the input (here we choose zeros)
+        #     return torch.zeros_like(hidden_states)
         
         # Forward through the expert
         return expert(hidden_states)
@@ -453,9 +453,9 @@ class BertMoEBlock(nn.Module):
                 # Get the hidden states for these tokens
                 token_hidden_states = hidden_states[batch_indices, seq_indices]
                 
-                # Apply expert dropout during training
-                if self.training and self.expert_dropout > 0 and torch.rand(1).item() < self.expert_dropout:
-                    continue
+                # # Apply expert dropout during training
+                # if self.training and self.expert_dropout > 0 and torch.rand(1).item() < self.expert_dropout:
+                #     continue
                 
                 # Forward through the expert (this computes ΔW_i^ffn)
                 expert_output = self.experts[expert_idx](token_hidden_states)
