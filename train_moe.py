@@ -130,7 +130,8 @@ parser.add_argument('--teacher_name_or_path', type=str, default=None,
 parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
 # configure wandb
-parser.add_argument('--wandb_project', type=str, default="ESE_MoE_v1.0", help='Specify WANDB_PROJECT, default None')
+parser.add_argument('--wandb_project', type=str, default="ESE_MoE", help='Specify WANDB_PROJECT, default None')
+# parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
 parser.add_argument('--config', type=str, default="config/bge_moe_base_all.yaml", help='Path to YAML config file.')
@@ -252,6 +253,26 @@ def process_moe_layers_arg(moe_layers_str):
         except (ValueError, SyntaxError) as e:
             raise ValueError(f"Invalid moe_layers format: {moe_layers_str}. Must be 'all' or a list like '[0,2,4,6]'") from e
 
+def copy_matching_parameters(model, model_name_or_path, verbose=False):
+    pritrained_model = AutoModel.from_pretrained(model_name_or_path)
+    pritrained_model_params = dict(pritrained_model.named_parameters())
+    copied_count = 0
+    for name, param in model.named_parameters():
+        if name in pritrained_model_params:
+            if param.shape == pritrained_model_params[name].shape:
+                param.data.copy_(pritrained_model_params[name].data)
+                copied_count += 1
+                if verbose:
+                    print(f"Copied: {name}")
+            else:
+                if verbose:
+                    print(f"Shape mismatch: {name} - {param.shape} vs {pritrained_model_params[name].shape}")
+        else:
+            if verbose:
+                print(f"Not found in source: {name}")
+
+    logger.info(f"Copied {copied_count}/{len(model.state_dict())} parameters from pretrained model {model_name_or_path} to the model.")
+    return model
 
 def load_bert_moe_model(args):
     """Load BertMoE model with BERT pretrained weights."""
@@ -273,6 +294,7 @@ def load_bert_moe_model(args):
         moe_layers=processed_moe_layers,  # Add the MoE layers configuration
     )
     model = BertMoEModel(moe_config)
+    model = copy_matching_parameters(model, args.model_name_or_path)
     return model
 
 
@@ -379,7 +401,7 @@ def main():
             back_bone_model = back_bone_model.to(dtype=torch.bfloat16)
         total_params = sum(p.numel() for p in back_bone_model.parameters())
         total_params_in_millions = total_params / 1e6
-        print(f"Total number of parameters: {total_params_in_millions:.2f}M")
+        logger.info(f"Total number of MoE model parameters: {total_params_in_millions:.2f}M")
 
     model = AnglE(args.model_name_or_path,
                   max_length=args.maxlen,
