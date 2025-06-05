@@ -253,26 +253,51 @@ def process_moe_layers_arg(moe_layers_str):
         except (ValueError, SyntaxError) as e:
             raise ValueError(f"Invalid moe_layers format: {moe_layers_str}. Must be 'all' or a list like '[0,2,4,6]'") from e
 
+
 def copy_matching_parameters(model, model_name_or_path, verbose=False):
-    pritrained_model = AutoModel.from_pretrained(model_name_or_path)
-    pritrained_model_params = dict(pritrained_model.named_parameters())
+    from transformers import AutoModel
+    pretrained_model = AutoModel.from_pretrained(model_name_or_path)
+    pretrained_params = dict(pretrained_model.named_parameters())
     copied_count = 0
+
+    def get_custom_mapping(name):
+        # Special mapping of up/down proj for MoE expert
+        if "moe_block.experts" in name:
+            parts = name.split(".")
+            layer_idx = parts[2]
+            proj_type = parts[6]  # "up_proj" or "down_proj"
+            param_type = parts[7]  # "weight" or "bias"
+
+            if proj_type == "up_proj":
+                return f"encoder.layer.{layer_idx}.intermediate.dense.{param_type}"
+            elif proj_type == "down_proj":
+                return f"encoder.layer.{layer_idx}.output.dense.{param_type}"
+        if "layer_norm" in name:
+            parts = name.split(".")
+            layer_idx = parts[2]
+            param_type = parts[4] 
+            return f"encoder.layer.{layer_idx}.attention.output.LayerNorm.{param_type}"
+        
+        return name
+
     for name, param in model.named_parameters():
-        if name in pritrained_model_params:
-            if param.shape == pritrained_model_params[name].shape:
-                param.data.copy_(pritrained_model_params[name].data)
+        mapped_name = get_custom_mapping(name)
+        if mapped_name in pretrained_params:
+            if param.shape == pretrained_params[mapped_name].shape:
+                param.data.copy_(pretrained_params[mapped_name].data)
                 copied_count += 1
                 if verbose:
                     print(f"Copied: {name}")
             else:
                 if verbose:
-                    print(f"Shape mismatch: {name} - {param.shape} vs {pritrained_model_params[name].shape}")
+                    print(f"Shape mismatch: {name} ({param.shape}) vs {mapped_name} ({pretrained_params[mapped_name].shape})")
         else:
             if verbose:
-                print(f"Not found in source: {name}")
+                print(f"Not found in source: {mapped_name}")
 
     logger.info(f"Copied {copied_count}/{len(model.state_dict())} parameters from pretrained model {model_name_or_path} to the model.")
     return model
+
 
 def load_bert_moe_model(args):
     """Load BertMoE model with BERT pretrained weights."""
