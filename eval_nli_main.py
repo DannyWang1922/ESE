@@ -101,36 +101,43 @@ def evaluate_layers(layer_indices, args, model, tokenizer, backbone, tasks):
     layer_scores = []
     nan_layers = []  
 
-    for layer_index in layer_indices:
-        batcher = create_batcher(args, model, tokenizer, backbone, layer_index)
-        params = get_senteval_params(args)
-        scores = []
-        results = {}
-        for task in tasks:
-            se = senteval.engine.SE(params, batcher, prepare)
-            _, result = evaluate_task(se, task)
-            results[task] = result
-
-        for task in ['STS12', 'STS13', 'STS14', 'STS15', 'STS16']:
-            scores.append("%.2f" % (results[task]['all']['spearman']['all'] * 100))
-        scores.append("%.2f" % (results['STSBenchmark']['test']['spearman'].correlation * 100))
-        scores.append("%.2f" % (results['SICKRelatedness']['test']['spearman'].correlation * 100))
-        avg_score = sum([float(s) for s in scores]) / (len(scores))
-        
-        if np.isnan(avg_score):
-            print(f"Layer {layer_index}: Avg STS Score = NaN (skipping)")
-            nan_layers.append(layer_index)
-        else:
-            layer_scores.append(avg_score)
-            print(f"Layer {layer_index}: Avg STS Score = {avg_score:.2f}")
-    
-    # Record problematic layers to file
     os.makedirs(args.out_dir, exist_ok=True)
-    with open(os.path.join(args.out_dir, "nan_layers.txt"), "w") as f:
-        f.write(f"Model: {args.model_name_or_path}\n")
-        f.write(f"Total layers: {len(layer_indices)}\n")
-        f.write(f"Problematic layers (NaN values): {len(nan_layers)}\n")
-        f.write("Layer indices with NaN values: " + ", ".join(map(str, nan_layers)) + "\n")
+    score_file_path = os.path.join(args.out_dir, "layer_scores.txt")
+
+    with open(score_file_path, "w") as score_file:
+        score_file.write(f"Model: {args.model_name_or_path}\n")
+
+        for layer_index in layer_indices:
+            batcher = create_batcher(args, model, tokenizer, backbone, layer_index)
+            params = get_senteval_params(args)
+            scores = []
+            results = {}
+            for task in tasks:
+                se = senteval.engine.SE(params, batcher, prepare)
+                _, result = evaluate_task(se, task)
+                results[task] = result
+
+            for task in ['STS12', 'STS13', 'STS14', 'STS15', 'STS16']:
+                scores.append("%.2f" % (results[task]['all']['spearman']['all'] * 100))
+            scores.append("%.2f" % (results['STSBenchmark']['test']['spearman'].correlation * 100))
+            scores.append("%.2f" % (results['SICKRelatedness']['test']['spearman'].correlation * 100))
+            avg_score = sum([float(s) for s in scores]) / (len(scores))
+            
+            if np.isnan(avg_score):
+                print(f"Layer {layer_index}: Avg STS Score = NaN (skipping)")
+                nan_layers.append(layer_index)
+            else:
+                layer_scores.append(avg_score)
+                print(f"Layer {layer_index}: Avg STS Score = {avg_score:.2f}")
+            
+            if np.isnan(avg_score):
+                print(f"Layer {layer_index}: Avg STS Score = NaN (skipping)")
+                nan_layers.append(layer_index)
+                score_file.write(f"Layer {layer_index}: NaN\n")
+            else:
+                layer_scores.append(avg_score)
+                print(f"Layer {layer_index}: Avg STS Score = {avg_score:.2f}")
+                score_file.write(f"Layer {layer_index}: Scores = {scores}, Avg = {avg_score:.2f}\n")
 
     return layer_scores
 
