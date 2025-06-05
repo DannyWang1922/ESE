@@ -385,6 +385,7 @@ class BertMoEBlock(nn.Module):
         # For tracking expert usage statistics
         self.expert_metrics = {
             "expert_utilization": torch.zeros(self.num_experts),
+            "expert_load_balance": 0.0,
         }
     
     def _initialize_diverse_experts(self):
@@ -471,6 +472,13 @@ class BertMoEBlock(nn.Module):
         device = hidden_states.device
         self.expert_metrics["expert_utilization"] = expert_counts / (batch_size * seq_len * self.top_k)
         self.expert_metrics["expert_utilization"] = self.expert_metrics["expert_utilization"].to(device)
+
+        expert_utilization = self.expert_metrics["expert_utilization"]
+        if torch.mean(expert_utilization) > 0:
+            self.expert_metrics["expert_load_balance"] = torch.std(expert_utilization) / torch.mean(expert_utilization).to(device)
+        else:
+            self.expert_metrics["expert_load_balance"] = torch.tensor(0.0, device=hidden_states.device).to(device)
+        
         return moe_output
     
     # def get_load_balancing_loss(self):
@@ -558,6 +566,7 @@ class BertMoELayer(nn.Module):
         # For tracking expert usage statistics
         self.expert_metrics = {
             "expert_utilization": torch.zeros(self.num_experts),
+            "expert_load_balance": 0.0
         }
 
     def forward(
@@ -633,6 +642,9 @@ class BertMoELayer(nn.Module):
             "expert_utilization", torch.zeros(self.num_experts, device=device))
         self.expert_metrics["expert_utilization"] = utilization.to(device)
 
+        load_balance = self.moe_block.expert_metrics.get("expert_load_balance", 0.0)
+        self.expert_metrics["expert_load_balance"] = load_balance.to(device)
+
         outputs = (layer_output,) + outputs
 
         # if decoder, return the attn key/values as the last output
@@ -687,6 +699,7 @@ class BertMoEEncoder(nn.Module):
             # Initialize metrics storage (will be updated during forward pass)
             self.expert_metrics = {
                 "per_layer_utilization": [],
+                "per_layer_expert_load_balance": [],
                 "expert_utilization": None,
                 "expert_load_balance": 0.0,
                 "moe_layers_used": list(self.moe_layer_indices),
@@ -712,6 +725,7 @@ class BertMoEEncoder(nn.Module):
 		# For load balancing and tracking (modify 1)
         if self.track_expert_metrics:
             self.expert_metrics["per_layer_utilization"] = []
+            self.expert_metrics["per_layer_expert_load_balance"] = []
             self.expert_metrics["expert_utilization"] = None
             self.expert_metrics["expert_load_balance"] = 0.0
             moe_layers_count = 0
@@ -762,6 +776,8 @@ class BertMoEEncoder(nn.Module):
                     if hasattr(layer_module, "expert_metrics"):
                         layer_util = layer_module.expert_metrics.get("expert_utilization")
                         self.expert_metrics["per_layer_utilization"].append((i, layer_util.detach().clone()))
+                        layer_balance = layer_module.expert_metrics.get("expert_load_balance")
+                        self.expert_metrics["per_layer_expert_load_balance"].append((i, layer_balance.detach().clone()))
 
             hidden_states = layer_outputs[0]
             if use_cache:
@@ -783,12 +799,11 @@ class BertMoEEncoder(nn.Module):
             # Average over layers
             avg_util = all_utils.mean(dim=0)  # shape: (E,)
             self.expert_metrics["expert_utilization"] = avg_util  # Replace list with avg
-            
+
             # Load balance as coefficient of variation
-            if torch.mean(avg_util) > 0:
-                self.expert_metrics["expert_load_balance"] = torch.std(avg_util) / torch.mean(avg_util)
-            else:
-                self.expert_metrics["expert_load_balance"] = torch.tensor(0.0, device=hidden_states.device)
+            load_balance_list = [balance  for _, balance in self.expert_metrics["per_layer_expert_load_balance"]]
+            if len(load_balance_list) > 0:
+                self.expert_metrics["expert_load_balance"] = sum(load_balance_list) / len(load_balance_list)
             
         if not return_dict:
             return tuple(

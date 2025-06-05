@@ -1092,20 +1092,22 @@ class EvaluateCallback(TrainerCallback):
                 # Save per-layer expert utilization
                 if "per_layer_utilization" in expert_metrics:
                     f.write("\nPer-layer Expert Utilization:\n")
-                    for layer_idx, util_tensor in expert_metrics["per_layer_utilization"]:
-                        util_list = util_tensor.tolist()
-                        f.write(f"  Layer {layer_idx}: {util_list}\n")
+                    for layer_idx, load_balance in expert_metrics["per_layer_utilization"]:
+                        util_list = load_balance.tolist()
+                        formatted_util_str = ", ".join(f"{x:.4f}" for x in util_list)
+                        f.write(f"  Layer {layer_idx}: [{formatted_util_str}]\n")
 
-                # Save averaged expert utilization
-                if "expert_utilization" in expert_metrics and expert_metrics["expert_utilization"] is not None:
-                    avg_util = expert_metrics["expert_utilization"].tolist()
-                    f.write(f"\nAverage Expert Utilization (across MoE layers):\n  {avg_util}\n")
+                # Save per-layer expert load balance
+                if "per_layer_expert_load_balance" in expert_metrics:
+                    f.write("\nPer-layer Expert load balance:\n")
+                    for layer_idx, load_balance in expert_metrics["per_layer_expert_load_balance"]:
+                        f.write(f"  Layer {layer_idx}: {load_balance:.4f}\n")
 
                 # Save expert load balance score
                 if "expert_load_balance" in expert_metrics:
                     balance = expert_metrics["expert_load_balance"]
                     balance_val = balance.item() if isinstance(balance, torch.Tensor) else balance
-                    f.write(f"\nExpert Load Balance (std/mean): {balance_val:.4f}\n")
+                    f.write(f"\nExpert Load Balance Avg: {balance_val:.4f}\n")
                 
                 f.write("=" * 100+"\n\n")
 
