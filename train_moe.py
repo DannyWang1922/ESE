@@ -272,12 +272,6 @@ def copy_matching_parameters(model, model_name_or_path, verbose=False):
                 return f"encoder.layer.{layer_idx}.intermediate.dense.{param_type}"
             elif proj_type == "down_proj":
                 return f"encoder.layer.{layer_idx}.output.dense.{param_type}"
-        if "layer_norm" in name:
-            parts = name.split(".")
-            layer_idx = parts[2]
-            param_type = parts[4] 
-            return f"encoder.layer.{layer_idx}.attention.output.LayerNorm.{param_type}"
-        
         return name
 
     for name, param in model.named_parameters():
