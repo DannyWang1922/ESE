@@ -159,12 +159,14 @@ parser.add_argument('--router_aux_loss_coef', type=float, default=0.01,
                     help='Coefficient for router auxiliary loss, default 0.01')
 parser.add_argument('--track_expert_metrics', type=bool, default=True,
                     help='Whether to track expert metrics, default True')
-parser.add_argument('--moe_layers', type=str, default='[11]',
+parser.add_argument('--moe_layers', type=str, default='all',
                     help='Which layers to use MoE. Options: "all" or list like "[0,2,4,6]"')
 parser.add_argument('--expert_init_strategy', type=str, default='diverse',
                     help='Expert initialization strategy, default diverse')
 parser.add_argument('--parallel_expert_computation', type=bool, default=False,
                     help='Whether to parallelize expert computation, default False')
+parser.add_argument('--moe_expert_intermediate_size', type=int, default=512)
+parser.add_argument('--moe_expert_compressed_size', type=int, default=128)
 
 # Add data loading amount argument
 parser.add_argument('--max_train_samples', type=str, default="10000",
@@ -254,7 +256,7 @@ def process_moe_layers_arg(moe_layers_str):
             raise ValueError(f"Invalid moe_layers format: {moe_layers_str}. Must be 'all' or a list like '[0,2,4,6]'") from e
 
 
-def copy_matching_parameters(model, model_name_or_path, verbose=True):
+def copy_matching_parameters(model, model_name_or_path, verbose=False):
     from transformers import AutoModel
     pretrained_model = AutoModel.from_pretrained(model_name_or_path)
     pretrained_params = dict(pretrained_model.named_parameters())
@@ -310,7 +312,9 @@ def load_bert_moe_model(args):
         router_z_loss_coef=args.router_z_loss_coef,
         router_aux_loss_coef=args.router_aux_loss_coef,
         track_expert_metrics=args.track_expert_metrics,
-        moe_layers=processed_moe_layers,  # Add the MoE layers configuration
+        moe_layers=processed_moe_layers,
+        moe_expert_intermediate_size=args.moe_expert_intermediate_size,
+        moe_expert_compressed_size=args.moe_expert_compressed_size,
     )
     model = BertMoEModel(moe_config)
     model = copy_matching_parameters(model, args.model_name_or_path)

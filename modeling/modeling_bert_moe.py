@@ -48,7 +48,7 @@ class BertMoEExpert(nn.Module):
         self.config = config
         
         # Create expert's intermediate layer (equivalent to BertIntermediate)
-        self.up_proj = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.down_proj1 = nn.Linear(config.hidden_size, config.moe_expert_intermediate_size)
         
         # Activation function
         if isinstance(config.hidden_act, str):
@@ -57,7 +57,7 @@ class BertMoEExpert(nn.Module):
             self.act_fn = config.hidden_act
         
         # Create expert's output layer (equivalent to BertOutput but without LayerNorm/residual)
-        self.down_proj = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.down_proj2 = nn.Linear(config.moe_expert_intermediate_size, config.moe_expert_compressed_size)
         
         # Initialize expert weights
         self._init_weights()
@@ -68,14 +68,14 @@ class BertMoEExpert(nn.Module):
         Using specific initialization can help with training stability.
         """
         # Initialize intermediate layer
-        nn.init.normal_(self.up_proj.weight, mean=0.0, std=self.config.initializer_range)
-        if self.up_proj.bias is not None:
-            nn.init.zeros_(self.up_proj.bias)
+        nn.init.normal_(self.down_proj1.weight, mean=0.0, std=self.config.initializer_range)
+        if self.down_proj1.bias is not None:
+            nn.init.zeros_(self.down_proj1.bias)
         
         # Initialize output layer
-        nn.init.normal_(self.down_proj.weight, mean=0.0, std=self.config.initializer_range)
-        if self.down_proj.bias is not None:
-            nn.init.zeros_(self.down_proj.bias)
+        nn.init.normal_(self.down_proj2.weight, mean=0.0, std=self.config.initializer_range)
+        if self.down_proj2.bias is not None:
+            nn.init.zeros_(self.down_proj2.bias)
     
     def forward(self, hidden_states):
         """
@@ -90,8 +90,8 @@ class BertMoEExpert(nn.Module):
                 Processed token representations.
         """
         # Forward through intermediate layer
-        intermediate_output = self.act_fn(self.up_proj(hidden_states))
-        output = self.down_proj(intermediate_output)
+        intermediate_output = self.act_fn(self.down_proj1(hidden_states))
+        output = self.down_proj2(intermediate_output)
         
         return output
 
@@ -434,7 +434,8 @@ class BertMoEBlock(nn.Module):
         self._last_gate_indices = selected_experts_indices
         
         # Initialize output tensor for accumulating expert outputs
-        moe_output = torch.zeros_like(hidden_states)
+        # moe_output = torch.zeros_like(hidden_states)
+        moe_output = torch.zeros(batch_size, seq_len, self.config.moe_expert_compressed_size, device=hidden_states.device, dtype=hidden_states.dtype)
         
         # Track which experts are used
         expert_counts = torch.zeros(self.num_experts, device=hidden_states.device)
@@ -670,6 +671,7 @@ class BertLayerWithMoEBlock(nn.Module):
             "expert_utilization": torch.zeros(self.num_experts),
             "expert_load_balance": 0.0
         }
+        self._cached_moe_output = None
 
     def forward(
         self,
@@ -728,7 +730,7 @@ class BertLayerWithMoEBlock(nn.Module):
         chunked_outputs = apply_chunking_to_forward(
             self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
         )
-        layer_output, moe_output = chunked_outputs
+        layer_output = chunked_outputs
         outputs = (layer_output,) + outputs
 
         # if decoder, return the attn key/values as the last output
@@ -741,7 +743,16 @@ class BertLayerWithMoEBlock(nn.Module):
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.output(intermediate_output, attention_output)
         moe_output = self.moe_block(layer_output)
-        return layer_output, moe_output
+
+        # Cache MoE output to ensure it is still in the computed graph
+        self._cached_moe_output = moe_output
+        return layer_output
+    
+    def get_cached_moe_output(self, clear_cache=False):
+        moe_output = self._cached_moe_output
+        if clear_cache:
+            self._cached_moe_output = None
+        return moe_output
 
 
 class BertMoEEncoder(nn.Module): 
@@ -755,7 +766,7 @@ class BertMoEEncoder(nn.Module):
         
         # Get MoE layer indices from config
         # Can be a list of layer indices [0, 2, 4, 6] or "all" for all layers
-        self.moe_layers = getattr(config, 'moe_layers', 'all')
+        self.moe_layers = config.moe_layers
         
         # Convert moe_layers to a set of indices for faster lookup
         if self.moe_layers == 'all':
@@ -794,6 +805,15 @@ class BertMoEEncoder(nn.Module):
                 "expert_load_balance": 0.0,
                 "moe_layers_used": list(self.moe_layer_indices),
             }
+
+    def collect_moe_outputs(self):
+        moe_outputs = {}
+        for i, layer in enumerate(self.layer):
+            if isinstance(layer, BertLayerWithMoEBlock) and hasattr(layer, 'get_cached_moe_output'):
+                moe_output = layer.get_cached_moe_output(clear_cache=False)
+                if moe_output is not None:
+                    moe_outputs[i] = moe_output
+        return moe_outputs
     
     def forward(
         self,
@@ -944,6 +964,9 @@ class BertMoEModel(BertPreTrainedModel):
         """
         for layer, heads in heads_to_prune.items():
             self.encoder.layer[layer].attention.prune_heads(heads)
+    
+    def get_moe_outputs(self):
+        return self.encoder.collect_moe_outputs()
 
     def forward(
         self,

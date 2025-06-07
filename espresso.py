@@ -868,6 +868,12 @@ class AngleESETrainer(AngleTrainer):
         self.n_layers = self.pooler.model.config.num_hidden_layers
         logger.info('Train with ☕️ Espresso!')
 
+        # Check if MoE model is used
+        self.use_moe_instead_of_pca = False
+        if hasattr(self.pooler.model, 'get_moe_outputs'):
+            self.use_moe_instead_of_pca = True
+            logger.info('MoE model detected, MoE output will be used instead of PCA compression')
+
     @torch.no_grad()
     def pca_compress(self, m: torch.Tensor, k: int) -> torch.Tensor:
         """ Get topk feature via PCA.
@@ -886,7 +892,8 @@ class AngleESETrainer(AngleTrainer):
                              all_layer_outputs: torch.Tensor,
                              labels: torch.Tensor,
                              pooling_strategy: str,
-                             padding_strategy: str) -> torch.Tensor:
+                             padding_strategy: str,
+                             moe_outputs: Optional[Dict] = None) -> torch.Tensor:
         loss = 0.
         compression_loss = 0.
         for i in range(self.n_layers - 1):
@@ -899,12 +906,26 @@ class AngleESETrainer(AngleTrainer):
 
             slimmed_outputs = student_outputs[:, :self.ese_compression_size]
             loss += self.loss_fct(labels, slimmed_outputs) / division # equ(2) first part
-            if self.apply_ese_pca: # equ(6) first part
-                compression_loss += self.distillation_loss( # distillation_loss: align(x, y) equ(6)
-                    slimmed_outputs,
-                    self.pca_compress(student_outputs, self.ese_compression_size),
-                    kl_temperature=self.ese_kl_temperature
-                ) / division
+            
+            # Use MoE ESE loss
+            if self.use_moe_instead_of_pca and moe_outputs and i in moe_outputs:
+                moe_output = moe_outputs[i]
+                compressed_outputs = get_pooling(moe_output,
+                                                inputs,
+                                                pooling_strategy,
+                                                padding_strategy)
+                compressed_outputs = compressed_outputs[:, :self.ese_compression_size]
+            # Use PCA ESE loss
+            else:
+                if self.apply_ese_pca: # equ(6) first part
+                    compressed_outputs = self.pca_compress(student_outputs, self.ese_compression_size)
+
+            compression_loss += self.distillation_loss( # distillation_loss: align(x, y) equ(6)
+                slimmed_outputs,
+                self.pca_compress(student_outputs, self.ese_compression_size),
+                kl_temperature=self.ese_kl_temperature
+            ) / division
+
         return (loss + compression_loss) / (self.n_layers - 1)
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
@@ -921,15 +942,39 @@ class AngleESETrainer(AngleTrainer):
         teacher_outputs = get_pooling(all_teacher_outputs, inputs,
                                       self.pooler.pooling_strategy,
                                       self.pooler.padding_strategy)
+        
+        moe_outputs = None # Collect MoE output (if available)
+        if self.use_moe_instead_of_pca and hasattr(model, 'get_moe_outputs'):
+            moe_outputs = model.get_moe_outputs()
 
         loss = self.loss_fct(labels, teacher_outputs) # equ(2) last part (full size last layer loss)
 
         slimmed_outputs = teacher_outputs[:, :self.ese_compression_size] # (compression size)
         loss += self.loss_fct(labels, slimmed_outputs)  # (slimmed last layer loss)
-        if self.apply_ese_pca: # equ(6) last part (last layer PCA loss)
-            loss += self.distillation_loss( # Input tensor; Target tensor
+
+        # Use MoE ESE loss
+        if self.use_moe_instead_of_pca and moe_outputs:
+            last_moe_layer_idx = max(moe_outputs.keys())
+            if last_moe_layer_idx in moe_outputs:
+                moe_output = moe_outputs[last_moe_layer_idx]
+                compressed_outputs = get_pooling(moe_output,
+                                                inputs,
+                                                self.pooler.pooling_strategy,
+                                                self.pooler.padding_strategy)
+                compressed_outputs = compressed_outputs[:, :self.ese_compression_size]
+            else:
+                compressed_outputs = self.pca_compress(teacher_outputs, self.ese_compression_size)
+        # Use PCA ESE loss
+        else:
+            if self.apply_ese_pca: # equ(6) last part (last layer PCA loss)
+                compressed_outputs = self.pca_compress(teacher_outputs, self.ese_compression_size)
+            else:
+                compressed_outputs = slimmed_outputs
+        
+        if self.apply_ese_pca or self.use_moe_instead_of_pca:
+            loss += self.distillation_loss(
                 slimmed_outputs,
-                self.pca_compress(teacher_outputs, self.ese_compression_size),
+                compressed_outputs,
                 kl_temperature=self.ese_kl_temperature
             )
 
@@ -940,6 +985,7 @@ class AngleESETrainer(AngleTrainer):
             labels,
             self.pooler.pooling_strategy,
             self.pooler.padding_strategy,
+            moe_outputs=moe_outputs
         )
 
         # alignment loss

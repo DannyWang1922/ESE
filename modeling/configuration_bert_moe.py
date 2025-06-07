@@ -41,6 +41,9 @@ class BertMoEConfig(PretrainedConfig):
         router_aux_loss_coef=0.01,
         track_expert_metrics=True,
         parallel_expert_computation=True,
+        moe_layers="all",
+        moe_expert_intermediate_size=512,
+        moe_expert_compressed_size=256,
         **kwargs
     ):
         """
@@ -111,3 +114,7 @@ class BertMoEConfig(PretrainedConfig):
         self.router_aux_loss_coef = router_aux_loss_coef
         self.track_expert_metrics = track_expert_metrics
         self.parallel_expert_computation = parallel_expert_computation
+        self.moe_layers=moe_layers
+        self.moe_expert_intermediate_size=moe_expert_intermediate_size
+        self.moe_expert_compressed_size=moe_expert_compressed_size
+        

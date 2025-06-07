@@ -43,4 +43,7 @@ ese_kl_temperature: 1.0
 # configure MoE
 use_bert_moe: 1
 moe_layers: all
-max_train_samples: 50000
+moe_expert_intermediate_size: 512
+moe_expert_compressed_size: 128
+max_train_samples: 5000
+track_expert_metrics: False
