@@ -25,10 +25,13 @@ from transformers.models.bert.modeling_bert import (
     BertEmbeddings,
     BertPooler,
     BertSelfAttention, 
-    BertSdpaSelfAttention
+    BertSdpaSelfAttention,
+    BertIntermediate,
+    BertOutput,
 )
 from transformers.models.bert.modeling_bert import *
-from transformers.pytorch_utils import find_pruneable_heads_and_indices, prune_linear_layer
+from transformers.pytorch_utils import find_pruneable_heads_and_indices, prune_linear_layer, apply_chunking_to_forward
+
 logger = logging.get_logger(__name__)
 
 
@@ -481,14 +484,6 @@ class BertMoEBlock(nn.Module):
         
         return moe_output
     
-    # def get_load_balancing_loss(self):
-    #     """Get the load balancing loss from the gate."""
-    #     if hasattr(self, '_last_gate_logits') and hasattr(self, '_last_gate_indices'):
-    #         return self.gate.compute_load_balancing_loss(
-    #             self._last_gate_logits, 
-    #             self._last_gate_indices
-    #         )
-    #     return torch.tensor(0.0)
 
 BERT_SELF_ATTENTION_CLASSES = {
     "eager": BertSelfAttention,
@@ -652,6 +647,101 @@ class BertMoELayer(nn.Module):
             outputs = outputs + (present_key_value,)
 
         return outputs
+    
+class BertLayerWithMoEBlock(nn.Module):
+    def __init__(self, config, num_experts=8, top_k=2):
+        super().__init__()
+        self.chunk_size_feed_forward = config.chunk_size_feed_forward
+        self.seq_len_dim = 1
+        self.attention = BertAttention(config)
+        self.is_decoder = config.is_decoder
+        self.add_cross_attention = config.add_cross_attention
+        if self.add_cross_attention:
+            if not self.is_decoder:
+                raise ValueError(f"{self} should be used as a decoder model if cross attention is added")
+            self.crossattention = BertAttention(config, position_embedding_type="absolute")
+        self.intermediate = BertIntermediate(config)
+        self.output = BertOutput(config)
+
+        self.num_experts = num_experts
+        self.top_k = top_k
+        self.moe_block = BertMoEBlock(config, num_experts, top_k)
+        self.expert_metrics = {
+            "expert_utilization": torch.zeros(self.num_experts),
+            "expert_load_balance": 0.0
+        }
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        encoder_attention_mask: Optional[torch.FloatTensor] = None,
+        past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+        output_attentions: Optional[bool] = False,
+    ) -> Tuple[torch.Tensor]:
+        # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
+        self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
+        self_attention_outputs = self.attention(
+            hidden_states,
+            attention_mask,
+            head_mask,
+            output_attentions=output_attentions,
+            past_key_value=self_attn_past_key_value,
+        )
+        attention_output = self_attention_outputs[0]
+
+        # if decoder, the last output is tuple of self-attn cache
+        if self.is_decoder:
+            outputs = self_attention_outputs[1:-1]
+            present_key_value = self_attention_outputs[-1]
+        else:
+            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
+
+        cross_attn_present_key_value = None
+        if self.is_decoder and encoder_hidden_states is not None:
+            if not hasattr(self, "crossattention"):
+                raise ValueError(
+                    f"If `encoder_hidden_states` are passed, {self} has to be instantiated with cross-attention layers"
+                    " by setting `config.add_cross_attention=True`"
+                )
+
+            # cross_attn cached key/values tuple is at positions 3,4 of past_key_value tuple
+            cross_attn_past_key_value = past_key_value[-2:] if past_key_value is not None else None
+            cross_attention_outputs = self.crossattention(
+                attention_output,
+                attention_mask,
+                head_mask,
+                encoder_hidden_states,
+                encoder_attention_mask,
+                cross_attn_past_key_value,
+                output_attentions,
+            )
+            attention_output = cross_attention_outputs[0]
+            outputs = outputs + cross_attention_outputs[1:-1]  # add cross attentions if we output attention weights
+
+            # add cross-attn cache to positions 3,4 of present_key_value tuple
+            cross_attn_present_key_value = cross_attention_outputs[-1]
+            present_key_value = present_key_value + cross_attn_present_key_value
+
+        chunked_outputs = apply_chunking_to_forward(
+            self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
+        )
+        layer_output, moe_output = chunked_outputs
+        outputs = (layer_output,) + outputs
+
+        # if decoder, return the attn key/values as the last output
+        if self.is_decoder:
+            outputs = outputs + (present_key_value,)
+
+        return outputs
+
+    def feed_forward_chunk(self, attention_output):
+        intermediate_output = self.intermediate(attention_output)
+        layer_output = self.output(intermediate_output, attention_output)
+        moe_output = self.moe_block(layer_output)
+        return layer_output, moe_output
 
 
 class BertMoEEncoder(nn.Module): 
@@ -684,8 +774,8 @@ class BertMoEEncoder(nn.Module):
         self.layer = nn.ModuleList()
         for i in range(config.num_hidden_layers):
             if i in self.moe_layer_indices:
-                # Use MoE layer
-                self.layer.append(BertMoELayer(config, self.num_experts, self.top_k))
+                # self.layer.append(BertMoELayer(config, self.num_experts, self.top_k))
+                self.layer.append(BertLayerWithMoEBlock(config, self.num_experts, self.top_k))
             else:
                 # Use standard BERT layer
                 self.layer.append(BertLayer(config))

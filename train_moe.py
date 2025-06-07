@@ -134,7 +134,7 @@ parser.add_argument('--wandb_project', type=str, default="ESE_MoE", help='Specif
 # parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
-parser.add_argument('--config', type=str, default="config/bge_moe_base_all.yaml", help='Path to YAML config file.')
+parser.add_argument('--config', type=str, default="config/bge_moe_ese_all.yaml", help='Path to YAML config file.')
 
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],
@@ -254,7 +254,7 @@ def process_moe_layers_arg(moe_layers_str):
             raise ValueError(f"Invalid moe_layers format: {moe_layers_str}. Must be 'all' or a list like '[0,2,4,6]'") from e
 
 
-def copy_matching_parameters(model, model_name_or_path, verbose=False):
+def copy_matching_parameters(model, model_name_or_path, verbose=True):
     from transformers import AutoModel
     pretrained_model = AutoModel.from_pretrained(model_name_or_path)
     pretrained_params = dict(pretrained_model.named_parameters())
@@ -275,19 +275,19 @@ def copy_matching_parameters(model, model_name_or_path, verbose=False):
         return name
 
     for name, param in model.named_parameters():
-        mapped_name = get_custom_mapping(name)
-        if mapped_name in pretrained_params:
-            if param.shape == pretrained_params[mapped_name].shape:
-                param.data.copy_(pretrained_params[mapped_name].data)
+        # name = get_custom_mapping(name)
+        if name in pretrained_params:
+            if param.shape == pretrained_params[name].shape:
+                param.data.copy_(pretrained_params[name].data)
                 copied_count += 1
                 if verbose:
                     print(f"Copied: {name}")
             else:
                 if verbose:
-                    print(f"Shape mismatch: {name} ({param.shape}) vs {mapped_name} ({pretrained_params[mapped_name].shape})")
+                    print(f"Shape mismatch: {name} ({param.shape}) vs {name} ({pretrained_params[name].shape})")
         else:
             if verbose:
-                print(f"Not found in source: {mapped_name}")
+                print(f"Not found in source: {name}")
 
     logger.info(f"Copied {copied_count}/{len(model.state_dict())} parameters from pretrained model {model_name_or_path} to the model.")
     return model

@@ -922,19 +922,19 @@ class AngleESETrainer(AngleTrainer):
                                       self.pooler.pooling_strategy,
                                       self.pooler.padding_strategy)
 
-        loss = self.loss_fct(labels, teacher_outputs) # equ(2) last part
+        loss = self.loss_fct(labels, teacher_outputs) # equ(2) last part (full size last layer loss)
 
-        slimmed_outputs = teacher_outputs[:, :self.ese_compression_size]
-        loss += self.loss_fct(labels, slimmed_outputs)  
-        if self.apply_ese_pca: # equ(6) last part
-            loss += self.distillation_loss(
+        slimmed_outputs = teacher_outputs[:, :self.ese_compression_size] # (compression size)
+        loss += self.loss_fct(labels, slimmed_outputs)  # (slimmed last layer loss)
+        if self.apply_ese_pca: # equ(6) last part (last layer PCA loss)
+            loss += self.distillation_loss( # Input tensor; Target tensor
                 slimmed_outputs,
                 self.pca_compress(teacher_outputs, self.ese_compression_size),
                 kl_temperature=self.ese_kl_temperature
             )
 
         # student loss
-        loss += self.compute_student_loss(
+        loss += self.compute_student_loss( # Shallow layer loss
             inputs,
             all_layer_outputs,
             labels,
