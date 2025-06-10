@@ -7,9 +7,9 @@ seed: 42
 workers: 16
 
 # configure Aoe
-cosine_w: 0.0
+cosine_w: 1.0
 ibn_w: 1.0
-angle_w: 0.02
+angle_w: 1.0
 cosine_tau: 20.0
 ibn_tau: 20.0
 angle_tau: 20.0
@@ -27,7 +27,7 @@ logging_steps: 500
 pooling_strategy: cls
 epochs: 10
 save_steps: 500
-batch_size: 16
+batch_size: 32
 maxlen: 512
 dataset_seed: 42
 
