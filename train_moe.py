@@ -360,7 +360,19 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
             logger.info(f'Limited {dataset_path} from {original_size} to {len(ds_split)} samples')
         
         # Apply the map operations
-        ds_split = ds_split.map(lambda obj: {"text1": str(obj["premise"]), "text2": str(obj["hypothesis"]), "label": obj["label"]})
+        # Convert NLI labels to similarity scores for AnglE training
+        # 0 (entailment) -> 1.0 (high similarity)
+        # 1 (neutral) -> 0.5 (medium similarity)  
+        # 2 (contradiction) -> 0.0 (low similarity)
+        def convert_nli_to_similarity(obj):
+            label_map = {0: 1.0, 1: 0.5, 2: 0.0}
+            return {
+                "text1": str(obj["premise"]), 
+                "text2": str(obj["hypothesis"]), 
+                "label": label_map.get(obj["label"], 0.5)  # default to 0.5 if label is missing
+            }
+        
+        ds_split = ds_split.map(convert_nli_to_similarity)
         ds_split = ds_split.select_columns(["text1", "text2", "label"])
         
         logger.info(f'Training dataset overview {dataset_path}:')
@@ -414,9 +426,10 @@ def load_and_process_valid_data(args, tokenizer, max_length, prompt_template=Non
         logger.info(f'Limited validation dataset from {original_size} to {len(valid_ds_split)} samples')
     
     # Now apply the map operations
+    # Normalize STS scores from 0-5 range to 0-1 range
     valid_ds_split = valid_ds_split.map(lambda obj: {"text1": str(obj["sentence1"]), 
                                          "text2": str(obj['sentence2']), 
-                                         "label": float(obj.get("score", 0.0))})
+                                         "label": float(obj.get("score", 0.0)) / 5.0})  # normalize to [0, 1]
     valid_ds_split = valid_ds_split.select_columns(["text1", "text2", "label"])
     
     logger.info(f'Test dataset overview {args.valid_name_or_path}:')
