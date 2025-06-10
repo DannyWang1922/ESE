@@ -175,7 +175,8 @@ def main():
     print("Using device:", device)
     
     # Initialize model, tokenizer, and Pooler
-    tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+    # Use the model's own tokenizer for consistency
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     if args.is_moe:
         backbone = BertMoEModel.from_pretrained(
                 args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
