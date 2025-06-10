@@ -130,8 +130,8 @@ parser.add_argument('--teacher_name_or_path', type=str, default=None,
 parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
                     help='Specify pooling strategy for teacher from [`cls`, `last`, `avg`, `cls_avg`, `max`], default `cls`')  # NOQA
 # configure wandb
-parser.add_argument('--wandb_project', type=str, default="ESE_MoE", help='Specify WANDB_PROJECT, default None')
-# parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
+# parser.add_argument('--wandb_project', type=str, default="ESE_MoE", help='Specify WANDB_PROJECT, default None')
+parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
 parser.add_argument('--config', type=str, default="config/bge_moe_ese_all.yaml", help='Path to YAML config file.')
@@ -174,20 +174,34 @@ parser.add_argument('--max_train_samples', type=str, default="10000",
 parser.add_argument('--max_valid_samples', type=str, default=None,
                     help='Maximum number of validation samples to load. If None, load all data. Default None')
 
-# Pre-parse config parameters
-config_args, remaining_argv = parser.parse_known_args()
+args = parser.parse_args()
 
-# If a config file is specified, read and update the parser's default values
-if config_args.config is not None:
-    with open(config_args.config, 'r') as f:
+# Record which parameters are explicitly specified from the command line
+cli_specified_args = set()
+for action in parser._actions:
+    if action.dest != 'help' and hasattr(args, action.dest):
+        specified = False
+        if action.dest in sys.argv:
+            specified = True
+        elif f'--{action.dest}' in sys.argv:
+            specified = True
+        elif action.option_strings:
+            for opt in action.option_strings:
+                if opt in sys.argv:
+                    specified = True
+                    break
+        if specified:
+            cli_specified_args.add(action.dest)
+print(cli_specified_args)
+
+if args.config is not None: 
+    with open(args.config, 'r') as f:
         config_data = yaml.safe_load(f)
         for key, value in config_data.items():
-            if any(a.dest == key for a in parser._actions):
-                parser.set_defaults(**{key: value})
-            else:
-                logger.warning(f"Unknown config key `{key}` in config file.")
+            if hasattr(args, key) and key not in cli_specified_args:
+                setattr(args, key, value)
+print(args)
 
-args = parser.parse_args()
 # Convert strings "none", "true", "false" to their actual Python types
 for arg in vars(args):
     if arg == "wandb_log_model":
@@ -402,7 +416,7 @@ def load_and_process_valid_data(args, tokenizer, max_length, prompt_template=Non
     # Now apply the map operations
     valid_ds_split = valid_ds_split.map(lambda obj: {"text1": str(obj["sentence1"]), 
                                          "text2": str(obj['sentence2']), 
-                                         "label": float(obj.get("score", 0.0))})  # normalize to [0, 1]
+                                         "label": float(obj.get("score", 0.0))})
     valid_ds_split = valid_ds_split.select_columns(["text1", "text2", "label"])
     
     logger.info(f'Test dataset overview {args.valid_name_or_path}:')

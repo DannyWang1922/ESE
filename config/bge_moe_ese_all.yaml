@@ -45,5 +45,5 @@ use_bert_moe: 1
 moe_layers: all
 moe_expert_intermediate_size: 512
 moe_expert_compressed_size: 128
-max_train_samples: 5000
+max_train_samples: 50000
 track_expert_metrics: False
