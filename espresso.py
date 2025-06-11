@@ -922,7 +922,7 @@ class AngleESETrainer(AngleTrainer):
 
             compression_loss += self.distillation_loss( # distillation_loss: align(x, y) equ(6)
                 slimmed_outputs,
-                self.pca_compress(student_outputs, self.ese_compression_size),
+                compressed_outputs,
                 kl_temperature=self.ese_kl_temperature
             ) / division
 

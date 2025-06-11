@@ -330,7 +330,7 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
 
     label_mapping = {
         0: 1,  # '0' (entailment)
-        1: 1,  # '1' (nurtural)
+        1: None,  # '1' (remove nurtural)
         2: 0,   # '2' (contradiction)
         -1: None
     }
