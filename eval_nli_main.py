@@ -241,7 +241,7 @@ def main():
 
     # Compute average performance of non-final layers
     print("\n[≺ Avg.] Computing average STS performance of all non-final layers...")
-    layer_indices = list(range(1, n_layers+1))
+    layer_indices = list(range(1, n_layers))
     sts_tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
     layer_scores = evaluate_layers(layer_indices, args, model, tokenizer, backbone, sts_tasks)
     pavg = sum([float(s) for s in layer_scores]) / len(layer_scores)
