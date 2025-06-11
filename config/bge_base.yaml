@@ -5,6 +5,7 @@ valid_split_name: test
 save_dir: ./train_result/bge_base
 seed: 42
 workers: 16
+max_train_samples: 50000
 
 # configure Aoe
 cosine_w: 0.0
@@ -27,7 +28,7 @@ logging_steps: 500
 pooling_strategy: cls
 epochs: 10
 save_steps: 500
-batch_size: 16
+batch_size: 32
 maxlen: 512
 dataset_seed: 42
 
@@ -42,4 +43,3 @@ ese_kl_temperature: 1.0
 
 # configure MoE
 use_bert_moe: 0
-max_train_samples: 50000
