@@ -174,33 +174,19 @@ parser.add_argument('--max_train_samples', type=str, default="10000",
 parser.add_argument('--max_valid_samples', type=str, default=None,
                     help='Maximum number of validation samples to load. If None, load all data. Default None')
 
-args = parser.parse_args()
-
-# Record which parameters are explicitly specified from the command line
-cli_specified_args = set()
-for action in parser._actions:
-    if action.dest != 'help' and hasattr(args, action.dest):
-        specified = False
-        if action.dest in sys.argv:
-            specified = True
-        elif f'--{action.dest}' in sys.argv:
-            specified = True
-        elif action.option_strings:
-            for opt in action.option_strings:
-                if opt in sys.argv:
-                    specified = True
-                    break
-        if specified:
-            cli_specified_args.add(action.dest)
-print(cli_specified_args)
-
-if args.config is not None: 
-    with open(args.config, 'r') as f:
+#  Priority: Command line parameters > Configuration file parameters > Default parameter values
+preliminary_args, _ = parser.parse_known_args()
+config_defaults = {}
+if preliminary_args.config:
+    with open(preliminary_args.config, 'r') as f:
         config_data = yaml.safe_load(f)
-        for key, value in config_data.items():
-            if hasattr(args, key) and key not in cli_specified_args:
-                setattr(args, key, value)
-print(args)
+    for key, value in config_data.items():
+        if any(a.dest == key for a in parser._actions):
+            config_defaults[key] = value
+        else:
+            logger.warning(f"Unknown config key `{key}` in config file.")
+parser.set_defaults(**config_defaults)
+args = parser.parse_args()
 
 # Convert strings "none", "true", "false" to their actual Python types
 for arg in vars(args):
@@ -342,6 +328,12 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
     else:
         dataset_path_list = ["nyu-mll/multi_nli", "stanfordnlp/snli"]
 
+    label_mapping = {
+        0: 1,  # '0' (entailment)
+        1: 1,  # '1' (nurtural)
+        2: 0,   # '2' (contradiction)
+        -1: None
+    }
     all_train_datasets = []
     for dataset_path in dataset_path_list:
         if os.path.exists(dataset_path):
@@ -360,7 +352,12 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
             logger.info(f'Limited {dataset_path} from {original_size} to {len(ds_split)} samples')
         
         # Apply the map operations
-        ds_split = ds_split.map(lambda obj: {"text1": str(obj["premise"]), "text2": str(obj["hypothesis"]), "label": obj["label"]})
+        ds_split = ds_split.map(lambda obj: {
+            "text1": str(obj["premise"]), 
+            "text2": str(obj["hypothesis"]), 
+            "label": label_mapping.get(obj["label"], None)  
+        })
+        ds_split = ds_split.filter(lambda example: example["label"] is not None) # Filter out invalid samples
         ds_split = ds_split.select_columns(["text1", "text2", "label"])
         
         logger.info(f'Training dataset overview {dataset_path}:')
