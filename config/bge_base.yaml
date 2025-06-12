@@ -5,7 +5,7 @@ valid_split_name: test
 save_dir: ./train_result/bge_base
 seed: 42
 workers: 16
-max_train_samples: 50000
+max_train_samples: 300000
 
 # configure Aoe
 cosine_w: 0.0
@@ -23,12 +23,12 @@ lora_dropout: 0.1
 
 # configure training
 learning_rate: 5e-5
-warmup_steps: 1500
+warmup_steps: 1800
 logging_steps: 500
 pooling_strategy: cls
-epochs: 10
+epochs: 3
 save_steps: 500
-batch_size: 32
+batch_size: 24
 maxlen: 512
 dataset_seed: 42
 
