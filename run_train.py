@@ -11,11 +11,9 @@ import sys
 # ]
 
 config = "bge_moe_ese_all.yaml"
-epoch = 5
-# learning_rate_list = [1e-4, 5e-5, 1e-5]
+learning_rate_list = [1e-4, 5e-5, 5e-6, 1e-6]
 # num_experts = [16, 8, 4]
 # moe_expert_intermediate_size_list = [512, 256]
-max_train_samples_list = [100000, 300000]
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 # cmd_list = []
@@ -23,14 +21,14 @@ nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 #     for num_expert in num_experts:
 #         for moe_expert_intermediate_size in moe_expert_intermediate_size_list:
 #             save_dir = f"output/bge_moe_ese_all_{lr}_{num_expert}_{moe_expert_intermediate_size}"
-#             cmd = f"{nv_cmd} python train_moe.py --learning_rate {lr} --num_experts {num_expert} --moe_expert_intermediate_size {moe_expert_intermediate_size} --save_dir {save_dir} --epoch {epoch} --config config/{config}"
+#             cmd = f"{nv_cmd} python train_moe.py --learning_rate {lr} --num_experts {num_expert} --moe_expert_intermediate_size {moe_expert_intermediate_size} --save_dir {save_dir} --config config/{config}"
 #             cmd_list.append(cmd)
 
 cmd_list = []
-for sample_size in max_train_samples_list:
-    save_dir = f"output/bge_moe_ese_all_{sample_size}"
-    cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --epoch {epoch} --config config/{config} --max_train_samples {sample_size}"
-    cmd_list.append(cmd)
+for lr in learning_rate_list:
+        save_dir = f"output/bge_moe_ese_all_{lr}"
+        cmd = f"{nv_cmd} python train_moe.py --learning_rate {lr} --save_dir {save_dir} --config config/{config}"
+        cmd_list.append(cmd)
 
 for cmd in cmd_list:
     print(f"\nRunning cmd: {cmd}\n")
