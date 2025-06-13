@@ -167,6 +167,7 @@ parser.add_argument('--parallel_expert_computation', type=bool, default=False,
                     help='Whether to parallelize expert computation, default False')
 parser.add_argument('--moe_expert_intermediate_size', type=int, default=512)
 parser.add_argument('--moe_expert_compressed_size', type=int, default=128)
+parser.add_argument('--loss_weight_decay', type=float, default=1.0)
 
 # Add data loading amount argument
 parser.add_argument('--max_train_samples', type=str, default="10000",
@@ -480,6 +481,7 @@ def main():
         trainer_kwargs = dict(trainer_kwargs, **{
             'ese_kl_temperature': args.ese_kl_temperature,
             'ese_compression_size': args.ese_compression_size,
+            'loss_weight_decay': args.loss_weight_decay,
         })
 
     model.fit(

@@ -856,6 +856,7 @@ class AngleESETrainer(AngleTrainer):
                  ese_kl_temperature: float = 1.0,
                  ese_compression_size: int = 128,
                  apply_ese_pca: bool = True,
+                 loss_weight_decay: float = 1.0,
                  **kwargs):
         super().__init__(pooler=pooler,
                          loss_kwargs=loss_kwargs,
@@ -866,6 +867,7 @@ class AngleESETrainer(AngleTrainer):
         self.ese_compression_size = ese_compression_size
         self.apply_ese_pca = apply_ese_pca
         self.n_layers = self.pooler.model.config.num_hidden_layers
+        self.loss_weight_decay = loss_weight_decay 
         logger.info('Train with ☕️ Espresso!')
 
         # Check if MoE model is used
@@ -948,6 +950,7 @@ class AngleESETrainer(AngleTrainer):
             moe_outputs = model.get_moe_outputs()
 
         loss = self.loss_fct(labels, teacher_outputs) # equ(2) last part (full size last layer loss)
+        loss = loss / self.loss_weight_decay
 
         slimmed_outputs = teacher_outputs[:, :self.ese_compression_size] # (compression size)
         loss += self.loss_fct(labels, slimmed_outputs)  # (slimmed last layer loss)
@@ -971,7 +974,7 @@ class AngleESETrainer(AngleTrainer):
             else:
                 compressed_outputs = slimmed_outputs
         
-        if self.apply_ese_pca or self.use_moe_instead_of_pca:
+        if self.apply_ese_pca or self.use_moe_instead_of_pca: # loss in one layer
             loss += self.distillation_loss(
                 slimmed_outputs,
                 compressed_outputs,

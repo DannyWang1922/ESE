@@ -11,20 +11,24 @@ import sys
 # ]
 
 # config = "bge_moe_ese_all.yaml"
-config_list = ["bge_ese.yaml"]
-learning_rate_list = [1e-4, 5e-5]
+loss_weight_decay_list = [10, 50, 100, 200]
+config_list = ["bge_moe_ese_all.yaml"]
+learning_rate_list = [5e-6]
+lr = "5e-6"
 # num_experts = [16, 8, 4]
 # moe_expert_intermediate_size_list = [512, 256]
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
 
 cmd_list = []
 for config in config_list:
-    for lr in learning_rate_list:
+    for wd in loss_weight_decay_list:
         if config == "bge_base.yaml":
-            save_dir = f"train_result/bge_base_{lr}"
+            save_dir = f"train_result/bge_base_{wd}"
         elif config == "bge_ese.yaml":
-            save_dir = f"train_result/bge_ese_{lr}"
-        cmd = f"{nv_cmd} python train_moe.py --learning_rate {lr} --save_dir {save_dir} --config config/{config}"
+            save_dir = f"train_result/bge_ese_{wd}"
+        elif config == "bge_moe_ese_all.yaml":
+            save_dir = f"train_result/bge_moe_ese_all_{wd}"
+        cmd = f"{nv_cmd} python train_moe.py --learning_rate {lr} --save_dir {save_dir} --config config/{config} --loss_weight_decay {wd}"
         print(cmd)
 #         cmd_list.append(cmd)
 
