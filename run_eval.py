@@ -4,14 +4,16 @@ import sys
 # NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1 python eval_nli_main.py --is_llm 0 --pooling_strategy cls  --batch_size 512 --model_name_or_path output/bge_base_30w/best-checkpoint --out_dir evl_res/bge_base_30w --is_moe 0
 
 
-model_name_or_path = ["bge_ese"]
-lr_rate_list = ["1e-04", "5e-05", "5e-06", "1e-06"]
-
-nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
+# model_name_or_path = ["bge_ese"]
+model_name_or_path = ["bge_moe_ese_all"]
+# lr_rate_list = ["1e-04", "5e-05", "5e-06", "1e-06"]
+wd_list = [2, 4, 6, 8]
+nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
 batch_size = 512
 
 for model_name in model_name_or_path:
-    for lr in  lr_rate_list:
+    for lr in  wd_list:
+        lr = str(lr)
         model_name_or_path = "train_result/" + model_name + "_" + lr + "/best-checkpoint"
         out_dir = "evl_res/" + model_name + "_" + lr
         plot_out_dir = "evl_res/"+ model_name+"/plot"

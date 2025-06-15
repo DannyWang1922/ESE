@@ -11,13 +11,13 @@ import sys
 # ]
 
 # config = "bge_moe_ese_all.yaml"
-loss_weight_decay_list = [10, 50, 100, 200]
+loss_weight_decay_list = [0.0001, 0.005, 0.001, 0.05, 0.1, 500, 1000]
 config_list = ["bge_moe_ese_all.yaml"]
 learning_rate_list = [5e-6]
 lr = "5e-6"
 # num_experts = [16, 8, 4]
 # moe_expert_intermediate_size_list = [512, 256]
-nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
+nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 cmd_list = []
 for config in config_list:

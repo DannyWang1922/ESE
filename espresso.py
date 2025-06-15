@@ -950,7 +950,7 @@ class AngleESETrainer(AngleTrainer):
             moe_outputs = model.get_moe_outputs()
 
         loss = self.loss_fct(labels, teacher_outputs) # equ(2) last part (full size last layer loss)
-        loss = loss / self.loss_weight_decay
+        loss = loss * self.loss_weight_decay
 
         slimmed_outputs = teacher_outputs[:, :self.ese_compression_size] # (compression size)
         loss += self.loss_fct(labels, slimmed_outputs)  # (slimmed last layer loss)
