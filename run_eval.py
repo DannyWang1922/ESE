@@ -40,7 +40,7 @@ for model_name in model_name_or_path:
                 is_moe = "0"
             
             # cmd = nv_cmd + f" python eval_nli_main.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --batch_size {batch_size} --model_name_or_path {model_name_or_path} --out_dir {out_dir} --is_moe {is_moe}"
-            cmd = nv_cmd + f" python eval_ese_layers.py --is_llm {is_llm} --pooling_strategy {pooling_strategy}  --batch_size {batch_size} --model_name_or_path {model_name_or_path} --out_dir {out_dir} --is_moe {is_moe} --embedding_size_list {embedding_size_list}"
+            cmd = nv_cmd + f" python eval_ese_layers.py --model_name_or_path {model_name_or_path} --out_dir {out_dir} --is_moe {is_moe} --embedding_size_list {embedding_size_list}"
             # print(cmd+ "\n")
             cmd_list.append(cmd)
             

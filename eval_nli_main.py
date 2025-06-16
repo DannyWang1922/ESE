@@ -156,7 +156,7 @@ def main():
     parser.add_argument("--task_set", type=str, choices=['sts', 'transfer', 'full', 'na'], default='sts', help="Task set")
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
     parser.add_argument('--out_dir', type=str, default="evl_res/main", help="Directory to save output files")
-    parser.add_argument('--batch_size', type=int, default=256, help="Eavluation batch size")
+    parser.add_argument('--batch_size', type=int, default=512, help="Eavluation batch size")
     parser.add_argument('--is_moe', type=int, default=1, help="Eavluation batch size")
 
     args = parser.parse_args()
