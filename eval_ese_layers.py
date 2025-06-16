@@ -86,7 +86,7 @@ def evaluate_single_layer(args, model, tokenizer, backbone, tasks, layer_index, 
         _, result = evaluate_task(se, task)
         results[task] = result
     score = results['STSBenchmark']['test']['spearman'].correlation * 100
-    score = round(score, 0) 
+    score = round(score, 4) 
     
     return score
 
