@@ -11,23 +11,22 @@ import sys
 # ]
 
 config_list = ["bge_moe_ese_all.yaml"]
-ese_compression_size_list =[32, 64, 128, 256, 512, 640, 768]
-moe_expert_intermediate_size_list = [256, 512]
+# ese_compression_size_list =[32, 64, 128, 256, 512, 640, 768]
+# moe_expert_intermediate_size_list = [256, 512]
+top_k = 4
+epoch = 5
+experts_num_list = [4, 8]
+# experts_num_list = [16]
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 
 cmd_list = []
 for config in config_list:
-    for moe_expert_intermediate_size in moe_expert_intermediate_size_list:
-        for ese_compression_size in ese_compression_size_list:
-            if config == "bge_base.yaml":
-                save_dir = f"train_result/bge_base_{moe_expert_intermediate_size}_{ese_compression_size}"
-            elif config == "bge_ese.yaml":
-                save_dir = f"train_result/bge_ese_{moe_expert_intermediate_size}_{ese_compression_size}"
-            elif config == "bge_moe_ese_all.yaml":
-                save_dir = f"train_result/bge_moe_ese_all_{moe_expert_intermediate_size}_{ese_compression_size}"
-            cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{config} --moe_expert_intermediate_size {moe_expert_intermediate_size} --ese_compression_size {ese_compression_size} --moe_expert_compressed_size {ese_compression_size}"
-            print(cmd)
-            # cmd_list.append(cmd)
+    for experts_num in experts_num_list:
+        if config == "bge_moe_ese_all.yaml":
+            save_dir = f"train_result/bge_moe_ese_all_{top_k}_{experts_num}"
+        cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{config} --num_experts {experts_num} --epochs {epoch} --top_k {top_k}"
+        print(cmd)
+        # cmd_list.append(cmd)
 
 # for cmd in cmd_list:
 #     print(f"\nRunning cmd: {cmd}\n")
