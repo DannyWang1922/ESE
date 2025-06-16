@@ -31,6 +31,7 @@ from transformers.models.bert.modeling_bert import (
 )
 from transformers.models.bert.modeling_bert import *
 from transformers.pytorch_utils import find_pruneable_heads_and_indices, prune_linear_layer, apply_chunking_to_forward
+import numpy as np
 
 logger = logging.get_logger(__name__)
 
@@ -283,75 +284,6 @@ class BertMoEGate(nn.Module):
             
         return gate_logits
 
-    # def compute_load_balancing_loss(self, gate_logits, gate_indices):
-    #     """
-    #     Compute auxiliary load balancing loss to encourage equal expert utilization.
-        
-    #     This loss encourages a uniform distribution of tokens across experts,
-    #     which helps prevent the "rich get richer" phenomenon where certain experts
-    #     receive most of the tokens.
-        
-    #     Args:
-    #         gate_logits: Tensor of shape [batch_size, seq_len, num_experts]
-    #             Full logits for routing each token to each expert.
-    #         gate_indices: Tensor of shape [batch_size, seq_len, top_k]
-    #             Indices of selected top-k experts for each token.
-                
-    #     Returns:
-    #         load_balancing_loss: Scalar tensor with the load balancing loss.
-    #     """
-    #     if not self.use_load_balancing:
-    #         return torch.tensor(0.0, device=gate_logits.device)
-        
-    #     batch_size, seq_len, _ = gate_logits.shape
-        
-    #     # 1. Calculate the fraction of tokens assigned to each expert
-    #     # Create one-hot encoding for expert assignments
-    #     # Shape: [batch_size * seq_len * top_k, num_experts]
-    #     expert_mask = torch.nn.functional.one_hot(
-    #         gate_indices.reshape(-1), 
-    #         num_classes=self.num_experts
-    #     ).float()
-        
-    #     # Sum across all token-expert assignments
-    #     # Shape: [num_experts]
-    #     tokens_per_expert = expert_mask.sum(dim=0) / (batch_size * seq_len * self.top_k)
-        
-    #     # 2. Calculate the average probability assigned to each expert
-    #     # First, get the probabilities from logits
-    #     gate_probs = torch.softmax(gate_logits, dim=-1)
-        
-    #     # Flatten for easier manipulation
-    #     # Shape: [batch_size * seq_len, num_experts]
-    #     gate_probs_flat = gate_probs.reshape(-1, self.num_experts)
-        
-    #     # For load balancing, we care about the total probability mass assigned to each expert
-    #     # Sum probabilities across all tokens for each expert
-    #     # Shape: [num_experts]
-    #     mean_expert_probs = gate_probs_flat.mean(dim=0)
-        
-    #     # 3. Calculate load balancing loss using coefficient of variation
-    #     # This encourages both uniform token distribution and uniform probability distribution
-        
-    #     # Token distribution CV (coefficient of variation)
-    #     tokens_cv = tokens_per_expert.std() / (tokens_per_expert.mean() + 1e-10)
-        
-    #     # Probability distribution CV
-    #     probs_cv = mean_expert_probs.std() / (mean_expert_probs.mean() + 1e-10)
-        
-    #     # Combine both aspects of load balancing
-    #     load_balancing_loss = tokens_cv + probs_cv
-        
-    #     # Optional: Add auxiliary z-loss for numerical stability
-    #     if hasattr(self, 'router_z_loss_coef') and self.router_z_loss_coef > 0:
-    #         # Z-loss encourages logits to be small to improve stability
-    #         # z_loss = log(sum(exp(logits)))^2
-    #         log_z = torch.logsumexp(gate_logits, dim=-1)
-    #         z_loss = torch.mean(log_z ** 2)
-    #         load_balancing_loss = load_balancing_loss + self.router_z_loss_coef * z_loss
-        
-    #     return load_balancing_loss
-
 
 class BertMoEBlock(nn.Module):
     """
@@ -387,7 +319,7 @@ class BertMoEBlock(nn.Module):
         
         # For tracking expert usage statistics
         self.expert_metrics = {
-            "expert_utilization": torch.zeros(self.num_experts),
+            "expert_utilization": [0.0] * self.num_experts,
             "expert_load_balance": 0.0,
         }
     
@@ -473,16 +405,21 @@ class BertMoEBlock(nn.Module):
                 moe_output[batch_indices, seq_indices] += scaled_expert_output
         
         # Update expert utilization metrics
-        device = hidden_states.device
-        self.expert_metrics["expert_utilization"] = expert_counts / (batch_size * seq_len * self.top_k)
-        self.expert_metrics["expert_utilization"] = self.expert_metrics["expert_utilization"].to(device)
+        total_tokens = batch_size * seq_len * self.top_k
+        expert_utilization_list = []
+        for i in range(self.num_experts):
+            utilization = float(expert_counts[i].item()) / total_tokens
+            expert_utilization_list.append(utilization)
+        self.expert_metrics["expert_utilization"] = expert_utilization_list
 
-        expert_utilization = self.expert_metrics["expert_utilization"]
-        if torch.mean(expert_utilization) > 0:
-            self.expert_metrics["expert_load_balance"] = torch.std(expert_utilization) / torch.mean(expert_utilization).to(device)
+        # Compute load balance
+        expert_utilization_tensor = torch.tensor(expert_utilization_list)
+        if torch.mean(expert_utilization_tensor) > 0:
+            load_balance = torch.std(expert_utilization_tensor) / torch.mean(expert_utilization_tensor)
+            self.expert_metrics["expert_load_balance"] = float(load_balance.item())
         else:
-            self.expert_metrics["expert_load_balance"] = torch.tensor(0.0, device=hidden_states.device).to(device)
-        
+            self.expert_metrics["expert_load_balance"] = 0.0  
+
         return moe_output
     
 
@@ -633,13 +570,8 @@ class BertMoELayer(nn.Module):
         moe_output = self.moe_block(hidden_states)   
         layer_output = residual  + moe_output
 
-        device = hidden_states.device
-        utilization = self.moe_block.expert_metrics.get(
-            "expert_utilization", torch.zeros(self.num_experts, device=device))
-        self.expert_metrics["expert_utilization"] = utilization.to(device)
-
-        load_balance = self.moe_block.expert_metrics.get("expert_load_balance", 0.0)
-        self.expert_metrics["expert_load_balance"] = load_balance.to(device)
+        self.expert_metrics["expert_utilization"] = self.moe_block.expert_metrics["expert_utilization"].copy()
+        self.expert_metrics["expert_load_balance"] = self.moe_block.expert_metrics["expert_load_balance"]
 
         outputs = (layer_output,) + outputs
 
@@ -668,7 +600,7 @@ class BertLayerWithMoEBlock(nn.Module):
         self.top_k = top_k
         self.moe_block = BertMoEBlock(config, num_experts, top_k)
         self.expert_metrics = {
-            "expert_utilization": torch.zeros(self.num_experts),
+            "expert_utilization": [0.0] * self.num_experts,
             "expert_load_balance": 0.0
         }
         self._cached_moe_output = None
@@ -744,6 +676,9 @@ class BertLayerWithMoEBlock(nn.Module):
         layer_output = self.output(intermediate_output, attention_output)
         moe_output = self.moe_block(layer_output)
 
+        self.expert_metrics["expert_utilization"] = self.moe_block.expert_metrics["expert_utilization"].copy()
+        self.expert_metrics["expert_load_balance"] = self.moe_block.expert_metrics["expert_load_balance"]
+
         # Cache MoE output to ensure it is still in the computed graph
         self._cached_moe_output = moe_output
         return layer_output
@@ -799,11 +734,8 @@ class BertMoEEncoder(nn.Module):
         if self.track_expert_metrics:
             # Initialize metrics storage (will be updated during forward pass)
             self.expert_metrics = {
-                "per_layer_utilization": [],
-                "per_layer_expert_load_balance": [],
-                "expert_utilization": None,
-                "expert_load_balance": 0.0,
-                "moe_layers_used": list(self.moe_layer_indices),
+                "expert_utilization": [0.0] * self.num_experts,
+                "expert_load_balance": 0.0
             }
 
     def collect_moe_outputs(self):
@@ -869,7 +801,6 @@ class BertMoEEncoder(nn.Module):
                     output_attentions,
                 )
             else:
-                # Forward through the MoE layer
                 layer_outputs = layer_module(
                     hidden_states,
                     attention_mask,
@@ -880,14 +811,17 @@ class BertMoEEncoder(nn.Module):
                     output_attentions,
                 )
                 
-                # If tracking expert metrics and this is a MoE layer, update metrics
-                if self.track_expert_metrics and i in self.moe_layer_indices:
-                    moe_layers_count += 1
-                    if hasattr(layer_module, "expert_metrics"):
-                        layer_util = layer_module.expert_metrics.get("expert_utilization")
-                        self.expert_metrics["per_layer_utilization"].append((i, layer_util.detach().clone()))
-                        layer_balance = layer_module.expert_metrics.get("expert_load_balance")
-                        self.expert_metrics["per_layer_expert_load_balance"].append((i, layer_balance.detach().clone()))
+            # If tracking expert metrics and this is a MoE layer, update metrics
+            if self.track_expert_metrics and i in self.moe_layer_indices:
+                moe_layers_count += 1
+                if hasattr(layer_module, "expert_metrics"):
+                    layer_util = layer_module.expert_metrics.get("expert_utilization")
+                    if layer_util is not None:
+                        self.expert_metrics["per_layer_utilization"].append((i, layer_util.copy()))
+
+                    layer_balance = layer_module.expert_metrics.get("expert_load_balance")
+                    if layer_balance is not None:
+                        self.expert_metrics["per_layer_expert_load_balance"].append((i, layer_balance))
 
             hidden_states = layer_outputs[0]
             if use_cache:
@@ -900,19 +834,17 @@ class BertMoEEncoder(nn.Module):
         # Final hidden states after all layers
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
-            
+
         # Calculate final expert utilization metrics across all MoE layers
         if self.track_expert_metrics and moe_layers_count > 0:
-            # Stack per-layer expert utilizations: shape [num_layers, num_experts]
-            all_utils = torch.stack([util for _, util in self.expert_metrics["per_layer_utilization"]])  # shape: (L, E)
+            if self.expert_metrics["per_layer_utilization"]:
+                all_utils = np.array([util for _, util in self.expert_metrics["per_layer_utilization"]])
+                avg_util = np.mean(all_utils, axis=0).tolist()  # return list
+                self.expert_metrics["expert_utilization"] = avg_util
             
-            # Average over layers
-            avg_util = all_utils.mean(dim=0)  # shape: (E,)
-            self.expert_metrics["expert_utilization"] = avg_util  # Replace list with avg
-
-            # Load balance as coefficient of variation
-            load_balance_list = [balance  for _, balance in self.expert_metrics["per_layer_expert_load_balance"]]
-            if len(load_balance_list) > 0:
+            # Load balance Avg
+            if self.expert_metrics["per_layer_expert_load_balance"]:
+                load_balance_list = [balance for _, balance in self.expert_metrics["per_layer_expert_load_balance"]]
                 self.expert_metrics["expert_load_balance"] = sum(load_balance_list) / len(load_balance_list)
             
         if not return_dict:

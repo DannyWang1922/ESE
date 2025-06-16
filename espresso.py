@@ -1141,8 +1141,7 @@ class EvaluateCallback(TrainerCallback):
                 # Save per-layer expert utilization
                 if "per_layer_utilization" in expert_metrics:
                     f.write("\nPer-layer Expert Utilization:\n")
-                    for layer_idx, load_balance in expert_metrics["per_layer_utilization"]:
-                        util_list = load_balance.tolist()
+                    for layer_idx, util_list in expert_metrics["per_layer_utilization"]:
                         formatted_util_str = ", ".join(f"{x:.4f}" for x in util_list)
                         f.write(f"  Layer {layer_idx}: [{formatted_util_str}]\n")
 
@@ -1155,8 +1154,7 @@ class EvaluateCallback(TrainerCallback):
                 # Save expert load balance score
                 if "expert_load_balance" in expert_metrics:
                     balance = expert_metrics["expert_load_balance"]
-                    balance_val = balance.item() if isinstance(balance, torch.Tensor) else balance
-                    f.write(f"\nExpert Load Balance Avg: {balance_val:.4f}\n")
+                    f.write(f"\nExpert Load Balance Avg: {balance:.4f}\n")
                 
                 f.write("=" * 100+"\n\n")
 
