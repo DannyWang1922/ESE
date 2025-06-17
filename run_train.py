@@ -10,23 +10,28 @@ import sys
 #     "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python train_moe.py --config config/bge_moe_ese_11.yaml"
 # ]
 
-config_list = ["bge_moe_ese_all.yaml"]
-# ese_compression_size_list =[32, 64, 128, 256, 512, 640, 768]
-# moe_expert_intermediate_size_list = [256, 512]
-top_k = 4
-epoch = 5
-experts_num_list = [4, 8]
-# experts_num_list = [16]
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
+config_list = ["bge_moe_ese_all.yaml"]
+
+epoch = 5
+loss_decay_type_list = [0, 2]
+prior_layers_weight_list = [0.1, 0.2]
+
+# loss_decay_type_list = [2]
+# prior_layers_weight_list = [0.3, 0.4, 0.5]
+
 
 cmd_list = []
 for config in config_list:
-    for experts_num in experts_num_list:
-        if config == "bge_moe_ese_all.yaml":
-            save_dir = f"train_result/bge_moe_ese_all_{top_k}_{experts_num}"
-        cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{config} --num_experts {experts_num} --epochs {epoch} --top_k {top_k}"
-        print(cmd)
-        # cmd_list.append(cmd)
+    for loss_decay_type in loss_decay_type_list:
+        for prior_layers_weight in prior_layers_weight_list:
+            if config == "bge_moe_ese_all.yaml":
+                save_dir = f"train_result/bge_moe_ese_all_{loss_decay_type}_{prior_layers_weight}"
+            cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{config}  --epochs {epoch} --loss_decay_type {loss_decay_type} --prior_layers_weight {prior_layers_weight}"
+            print(cmd)
+            if loss_decay_type == 0:
+                break
+            # cmd_list.append(cmd)
 
 # for cmd in cmd_list:
 #     print(f"\nRunning cmd: {cmd}\n")

@@ -167,7 +167,14 @@ parser.add_argument('--parallel_expert_computation', type=bool, default=False,
                     help='Whether to parallelize expert computation, default False')
 parser.add_argument('--moe_expert_intermediate_size', type=int, default=512)
 parser.add_argument('--moe_expert_compressed_size', type=int, default=128)
-parser.add_argument('--loss_weight_decay', type=float, default=1.0)
+
+
+parser.add_argument('--loss_decay_type', type=int, default=2, choices=[0, 1, 2], 
+                    help='Specify loss decay type, choices [0, 1], default 1. '
+                         '0 for no decay, 1 for ESE loss decay, 2 for sentence-transformer loss decay')
+parser.add_argument('--last_layer_loss_weight', type=float, default=1.0)
+parser.add_argument('--prior_layers_weight', type=float, default=1.0)
+
 
 # Add data loading amount argument
 parser.add_argument('--max_train_samples', type=str, default="10000",
@@ -481,7 +488,9 @@ def main():
         trainer_kwargs = dict(trainer_kwargs, **{
             'ese_kl_temperature': args.ese_kl_temperature,
             'ese_compression_size': args.ese_compression_size,
-            'loss_weight_decay': args.loss_weight_decay,
+            'loss_decay_type': args.loss_decay_type,
+            'last_layer_loss_weight': args.last_layer_loss_weight,
+            'prior_layers_weight': args.prior_layers_weight,
         })
 
     model.fit(
