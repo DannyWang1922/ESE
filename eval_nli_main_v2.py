@@ -9,6 +9,7 @@ $ bash download_dataset.sh
 import sys
 import os
 import logging
+from datetime import datetime
 
 logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
 import torch
@@ -31,28 +32,29 @@ import senteval  # type: ignore
 
 PATH_TO_DATA = './SentEval/data'
 
-def print_table(task_names, scores):
+def print_table(task_names, scores, out_dir=None):
     tb = PrettyTable()
     tb.field_names = task_names
     tb.add_row(scores)
     print(tb)
-
-def save_table_as_csv(task_names, scores, layer_scores, out_dir): 
-    csv_path = os.path.join(out_dir, "main_table.csv")
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(task_names)
-        writer.writerow(scores)
-        writer.writerow(layer_scores)
+    
+    if out_dir:  # save to txt file
+        result_file_path = os.path.join(out_dir, "main_result.txt")
+        with open(result_file_path, "w") as f:
+            f.write(f"Evaluation Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n") # Add timestamps and separators
+            f.write("="*80 + "\n\n")
+            f.write(str(tb))
+            f.write("\n")
+        print(f"\nMain results saved to: {result_file_path}")
 
 def save_table_with_detailed_scores(task_names, scores, layer_default_scores, layer_best_scores, layer_all_scores, out_dir):
-    """保存包含详细分数信息的CSV文件"""
+    """Save CSV file containing detailed score information"""
     csv_path = os.path.join(out_dir, "main_table_with_sizes.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(task_names)
         writer.writerow(scores)
-        writer.writerow([])  # 空行
+        writer.writerow([])
         writer.writerow(["Layer", "Default Score", "Best Score", "Best Size"])
         
         for i, (default_score, best_score) in enumerate(zip(layer_default_scores, layer_best_scores)):
@@ -116,52 +118,14 @@ def evaluate_task(se, task):
         score = result['test']['spearman'].correlation * 100
     return score, result
 
-def evaluate_layers(layer_indices, args, model, tokenizer, backbone, tasks):
-    """Evaluate the performance of multiple layers"""
-    layer_scores = []
-    nan_layers = []  
-
-    os.makedirs(args.out_dir, exist_ok=True)
-    score_file_path = os.path.join(args.out_dir, "layer_scores.txt")
-
-    with open(score_file_path, "w") as score_file:
-        score_file.write(f"Model: {args.model_name_or_path}\n")
-
-        for layer_index in layer_indices:
-            batcher = create_batcher(args, model, tokenizer, backbone, layer_index)
-            params = get_senteval_params(args)
-            scores = []
-            results = {}
-            for task in tasks:
-                se = senteval.engine.SE(params, batcher, prepare)
-                _, result = evaluate_task(se, task)
-                results[task] = result
-
-            for task in ['STS12', 'STS13', 'STS14', 'STS15', 'STS16']:
-                scores.append("%.2f" % (results[task]['all']['spearman']['all'] * 100))
-            scores.append("%.2f" % (results['STSBenchmark']['test']['spearman'].correlation * 100))
-            scores.append("%.2f" % (results['SICKRelatedness']['test']['spearman'].correlation * 100))
-            avg_score = sum([float(s) for s in scores]) / (len(scores))
-            
-            if np.isnan(avg_score):
-                print(f"Layer {layer_index}: Avg STS Score = NaN (skipping)")
-                nan_layers.append(layer_index)
-                score_file.write(f"Layer {layer_index}: NaN\n")
-            else:
-                layer_scores.append(avg_score)
-                print(f"Layer {layer_index}: Avg STS Score = {avg_score:.2f}")
-                score_file.write(f"Layer {layer_index}: Scores = {scores}, Avg = {avg_score:.2f}\n")
-
-    return layer_scores
-
 def evaluate_layers_with_sizes(layer_indices, embedding_sizes, args, model, tokenizer, backbone, tasks):
     """评估多个层在不同 embedding_size 下的性能"""
-    layer_best_scores = []  # best score for each layer
-    layer_all_scores = {}   # scores of all embedding sizes of each layer
-    layer_default_scores = []  # scores of full embedding sizes of each layer
+    layer_best_scores = []  # Store the best score for each layer
+    layer_all_scores = {}   # Store all score for each layer
+    layer_default_scores = []  # Store the full embedding size score for each layer
     nan_layers = []
     
-    # the last embedding_size is full embedding size
+    # Assuming that the last embedding is the complete embedding size
     full_embedding_size = embedding_sizes[-1]
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -200,7 +164,8 @@ def evaluate_layers_with_sizes(layer_indices, embedding_sizes, args, model, toke
                     if avg_score > best_score:
                         best_score = avg_score
                         best_size = emb_size
-                    if emb_size == full_embedding_size: # Record the score for the full embedding size
+                    # Record the score for the full embedding size
+                    if emb_size == full_embedding_size:
                         default_score = avg_score
                     print(f"Layer {layer_index}, Size {emb_size}: Avg STS Score = {avg_score:.2f}")
                     score_file.write(f"Layer {layer_index}, Size {emb_size}: Scores = {scores}, Avg = {avg_score:.2f}\n")
@@ -228,7 +193,7 @@ def main():
     parser.add_argument("--layer_index", type=int, default=-1, help="Layer index to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
-    parser.add_argument("--model_name_or_path", type=str, default="train_result/bge_moe_ese_all/best-checkpoint", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
+    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
     parser.add_argument("--prompt_template", type=str, default=None)
     # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
@@ -305,28 +270,28 @@ def main():
         args.tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
         args.tasks += ['MR', 'CR', 'MPQA', 'SUBJ', 'SST2', 'TREC', 'MRPC']
     
-    # # Calculate last-layer performance
-    # batcher = create_batcher(args, model, tokenizer, backbone)
-    # params = get_senteval_params(args)
+    # Main table
+    batcher = create_batcher(args, model, tokenizer, backbone)
+    params = get_senteval_params(args)
     
-    # results = {}
-    # for task in args.tasks:
-    #     se = senteval.engine.SE(params, batcher, prepare)
-    #     _, result = evaluate_task(se, task)
-    #     results[task] = result
+    results = {}
+    for task in args.tasks:
+        se = senteval.engine.SE(params, batcher, prepare)
+        _, result = evaluate_task(se, task)
+        results[task] = result
 
-    # task_names = ['Model'] + ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STS-B', 'SICK-R', 'Avg.']
-    # scores = [args.model_name_or_path]
-    # for task in ['STS12', 'STS13', 'STS14', 'STS15', 'STS16']:
-    #     scores.append("%.2f" % (results[task]['all']['spearman']['all'] * 100))
-    # scores.append("%.2f" % (results['STSBenchmark']['test']['spearman'].correlation * 100))
-    # scores.append("%.2f" % (results['SICKRelatedness']['test']['spearman'].correlation * 100))
-    # avg = sum([float(s) for s in scores[1:]]) / (len(scores)-1) # Subtract model name
-    # scores.append("%.2f" % avg)
-
+    task_names = ['Model', 'STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STS-B', 'SICK-R', 'Avg.']
     scores = [args.model_name_or_path]
-    # Calculate shallow performance
-    layer_indices = list(range(1, n_layers))  # ignore the last layer
+    for task in ['STS12', 'STS13', 'STS14', 'STS15', 'STS16']:
+        scores.append("%.2f" % (results[task]['all']['spearman']['all'] * 100))
+    scores.append("%.2f" % (results['STSBenchmark']['test']['spearman'].correlation * 100))
+    scores.append("%.2f" % (results['SICKRelatedness']['test']['spearman'].correlation * 100))
+    avg = sum([float(s) for s in scores[1:]]) / (len(scores)-1) # Subtract model name
+    scores.append("%.2f" % avg)
+
+    # Calculate the average performance of each layer under different embeddings sizes
+    print("\n[Max Avg. & ≺ Avg.] Computing STS performance across embedding sizes for all non-final layers...")
+    layer_indices = list(range(1, n_layers))  # Exclude the last layer
     sts_tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
     
     # Obtain the best score and default score for each layer
@@ -334,25 +299,24 @@ def main():
         layer_indices, embedding_sizes, args, model, tokenizer, backbone, sts_tasks
     )
     
-    # 计算 Max Avg. (非最后一层的最佳 embedding_size 结果的平均)
+    # Calculate Max Avg. (the average of the best embeddings size results for non final layers)
     max_avg = sum(layer_best_scores) / len(layer_best_scores) if layer_best_scores else 0
     
-    # 计算 ≺ Avg. (使用完整 embedding_size 的平均)
+    # Calculate ≺ Avg. (using the average of the full embeddings size)
     pavg = sum(layer_default_scores) / len(layer_default_scores) if layer_default_scores else 0
     
     print(f"\n≺ Avg. (default embedding size): {pavg:.2f}")
     print(f"Max Avg. (best embedding size per layer): {max_avg:.2f}")
     
-    # # 更新表格
-    # scores.append("%.2f" % pavg)
-    # task_names.append("≺ Avg.")
-    # scores.append("%.2f" % max_avg)
-    # task_names.append("Max Avg.")
+    # Update Table - Add Two New Columns
+    scores.append("%.2f" % pavg)
+    scores.append("%.2f" % max_avg)
+    task_names.extend(['≺ Avg.', 'Max Avg.'])
 
-    # print_table(task_names, scores)
-    
-    # # 保存详细结果
-    # save_table_with_detailed_scores(task_names, scores, layer_default_scores, layer_best_scores, layer_all_scores, args.out_dir)
+    # Ensure that the lengths of scores and task_name are consistent
+    assert len(scores) == len(task_names), f"Length mismatch: scores={len(scores)}, task_names={len(task_names)}"
+    print_table(task_names, scores, args.out_dir)
+    save_table_with_detailed_scores(task_names, scores, layer_default_scores, layer_best_scores, layer_all_scores, args.out_dir)
 
 if __name__ == "__main__":
     main()
