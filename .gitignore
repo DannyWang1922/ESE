@@ -12,3 +12,4 @@ wandb/
 .idea/
 test.py
 train_result/
+.history/
