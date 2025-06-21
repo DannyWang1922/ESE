@@ -173,7 +173,8 @@ parser.add_argument('--loss_decay_type', type=int, default=2, choices=[0, 1, 2],
                     help='Specify loss decay type, choices [0, 1], default 1. '
                          '0 for no decay, 1 for ESE loss decay, 2 for sentence-transformer loss decay')
 parser.add_argument('--last_layer_loss_weight', type=float, default=1.0)
-parser.add_argument('--prior_layers_weight', type=float, default=1.0)
+parser.add_argument('--prior_layers_weight', type=float, default=0.8)
+parser.add_argument('--last_layer_loss3_weight', type=float, default=0.5)
 
 
 # Add data loading amount argument
@@ -491,6 +492,7 @@ def main():
             'loss_decay_type': args.loss_decay_type,
             'last_layer_loss_weight': args.last_layer_loss_weight,
             'prior_layers_weight': args.prior_layers_weight,
+            'last_layer_loss3_weight': args.last_layer_loss3_weight,
         })
 
     model.fit(

@@ -9,7 +9,7 @@ nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 CURRENT_EXPERIMENT = {
     "config": "bge_moe_ese_all.yaml",  # 使用的配置文件
     "epochs": 3,                        # 训练轮数
-    "seed": [-1],
+    "last_layer_loss3_weight": [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
     
     # 当前实验中要尝试的超参数及其取值范围（以下参数根据需要可以注释掉不需要的）
     # "last_layer_loss_weight": [0.05, 0.1],
@@ -87,19 +87,19 @@ def main():
     # 生成训练命令
     train_commands = generate_train_commands()
     print("\nTraining Commands:")
-    for cmd, _ in train_commands:
-        print(cmd)
+    # for cmd, _ in train_commands:
+    #     print(cmd)
     
     # 运行训练
-    # run_commands(train_commands)
+    run_commands(train_commands)
     
     # 生成并运行评估命令
     eval_commands = generate_eval_commands(train_commands)
     print("\nEvaluation Commands:")
-    for cmd in eval_commands:
-        print(cmd)
+    # for cmd in eval_commands:
+    #     print(cmd)
     
-    # run_commands(eval_commands, is_eval=True)
+    run_commands(eval_commands, is_eval=True)
 
 if __name__ == "__main__":
     main()

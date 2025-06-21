@@ -49,4 +49,6 @@ moe_expert_intermediate_size: 512
 moe_expert_compressed_size: 128
 track_expert_metrics: True
 
-loss_weight_decay: 1.0
+loss_decay_type: 2
+prior_layers_weight: 0.8
+last_layer_loss_weight: 1.0

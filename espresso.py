@@ -859,6 +859,7 @@ class AngleESETrainer(AngleTrainer):
                  last_layer_loss_weight: float = 1.0,
                  loss_decay_type: int = 0,
                  prior_layers_weight: float = 1.0,
+                 last_layer_loss3_weight: float = 1.0,
                  **kwargs):
         super().__init__(pooler=pooler,
                          loss_kwargs=loss_kwargs,
@@ -873,6 +874,7 @@ class AngleESETrainer(AngleTrainer):
         self.loss_decay_type = loss_decay_type
         self.last_layer_loss_weight = last_layer_loss_weight
         self.prior_layers_weight = prior_layers_weight
+        self.last_layer_loss3_weight = last_layer_loss3_weight
         logger.info('Train with ☕️ Espresso!')
 
         # Check if MoE model is used
@@ -989,7 +991,7 @@ class AngleESETrainer(AngleTrainer):
                 slimmed_outputs,
                 compressed_outputs,
                 kl_temperature=self.ese_kl_temperature
-            ) * self.last_layer_loss_weight
+            ) * self.last_layer_loss_weight * self.last_layer_loss3_weight
 
         # student loss
         loss += self.compute_student_loss( # Shallow layer loss
