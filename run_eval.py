@@ -9,14 +9,15 @@ embedding_size_list = "32,64,128,256,512,640,768"
 cmd_list = []
 # loss_decay_type_list = [0, 2]
 # prior_layers_weight_list = [0.6, 0.7, 0.8]
-last_layer_loss_weight = [1.25, 1.5, 1.75, 2.0, 5.0, 10]
+# last_layer_loss_weight = [1.25, 1.5, 1.75, 2.0, 5.0, 10]
+last_layer_loss3_weigh_list = [0.0, 0.5, 1.0]
 
 for model_name in model_name_or_path:
-    for last_layer_loss_weight in last_layer_loss_weight:
-        last_layer_loss_weight = str(last_layer_loss_weight)
+    for last_layer_loss3_weight in last_layer_loss3_weigh_list:
+        last_layer_loss3_weight = str(last_layer_loss3_weight)
 
-        model_name_or_path = f"train_result/{model_name}_{last_layer_loss_weight}/best-checkpoint"
-        out_dir = f"evl_res/{model_name}_{last_layer_loss_weight}"
+        model_name_or_path = f"train_result/{model_name}_last_layer_loss3_weight_{last_layer_loss3_weight}/best-checkpoint"
+        out_dir = f"evl_res/{model_name}_last_layer_loss3_weight_{last_layer_loss3_weight}"
         
         plot_out_dir = out_dir+"/plot"
 
@@ -32,8 +33,8 @@ for model_name in model_name_or_path:
         else:
             is_moe = "0"
         
-        cmd = nv_cmd + f" python eval_nli_main_v2.py --model_name_or_path {model_name_or_path} --out_dir {out_dir} --is_moe {is_moe}"
-        # cmd = nv_cmd + f" python eval_ese_layers.py --model_name_or_path {model_name_or_path} --out_dir {plot_out_dir} --is_moe {is_moe} --embedding_size_list {embedding_size_list}"
+        # cmd = nv_cmd + f" python eval_nli_main_v2.py --model_name_or_path {model_name_or_path} --out_dir {out_dir} --is_moe {is_moe}"
+        cmd = nv_cmd + f" python eval_ese_layers.py --model_name_or_path {model_name_or_path} --out_dir {plot_out_dir} --is_moe {is_moe} --embedding_size_list {embedding_size_list}"
         print(cmd+ "\n")
         # cmd_list.append(cmd)
         

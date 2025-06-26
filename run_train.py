@@ -8,8 +8,8 @@ nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
 # 当前实验的超参数配置
 CURRENT_EXPERIMENT = {
     "config": "bge_moe_ese_all.yaml",  # 使用的配置文件
-    "epochs": 3,                        # 训练轮数
-    "last_layer_loss3_weight": [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+    "epochs": 5,                        # 训练轮数
+    "last_layer_loss_weight": [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
     
     # 当前实验中要尝试的超参数及其取值范围（以下参数根据需要可以注释掉不需要的）
     # "last_layer_loss_weight": [0.05, 0.1],
