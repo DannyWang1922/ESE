@@ -335,11 +335,13 @@ class BertMoEBlock(nn.Module):
             with torch.no_grad():
                 # Scale intermediate weights by a small factor based on expert index
                 scale_factor = 1.0 + (i - self.num_experts // 2) * 0.01
-                expert.intermediate.weight.data *= scale_factor
+                expert.down_proj1.weight.data *= scale_factor
+                expert.down_proj2.weight.data *= scale_factor
                 
                 # Optionally, slightly adjust bias terms too
-                if expert.intermediate.bias is not None:
-                    expert.intermediate.bias.data += (i - self.num_experts // 2) * 0.001
+                if expert.down_proj1.bias is not None:
+                    expert.down_proj1.bias.data += (i - self.num_experts // 2) * 0.001
+                    expert.down_proj2.bias.data += (i - self.num_experts // 2) * 0.001
     
     def forward(self, hidden_states):
         """

@@ -1,0 +1,54 @@
+model_name_or_path: Qwen/Qwen3-Embedding-0.6B
+train_split_name: train
+valid_name_or_path: mteb/stsbenchmark-sts
+valid_split_name: test
+save_dir: ./train_result/qwen_moe_ese
+seed: 42
+workers: 16
+max_train_samples: None
+
+# configure Aoe
+cosine_w: 0.0
+ibn_w: 1.0
+angle_w: 0.02
+cosine_tau: 20.0
+ibn_tau: 20.0
+angle_tau: 20.0
+
+# configure lora
+apply_lora: 0
+lora_r: 32
+lora_alpha: 32
+lora_dropout: 0.1
+
+# configure training
+learning_rate: 5e-6
+warmup_steps: 6500
+logging_steps: 500
+pooling_strategy: cls
+epochs: 5
+save_steps: 500
+batch_size: 24
+maxlen: 512
+dataset_seed: 42
+
+# configure LLM
+is_llm: 0
+apply_billm: 0
+
+# configure ESE
+apply_ese: 1
+ese_compression_size: 128
+ese_kl_temperature: 1.0
+
+# configure MoE
+use_bert_moe: 1
+num_experts: 4
+moe_layers: all
+moe_expert_intermediate_size: 512
+moe_expert_compressed_size: 128
+track_expert_metrics: True
+
+loss_decay_type: 2
+prior_layers_weight: 0.8
+last_layer_loss_weight: 1.0

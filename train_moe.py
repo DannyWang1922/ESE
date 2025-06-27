@@ -21,7 +21,9 @@ import yaml
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from modeling.modeling_bert_moe import BertMoEModel
 from modeling.configuration_bert_moe import BertMoEConfig
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoConfig
+from modeling.configuration_qwen_moe import Qwen3MoEConfig
+from modeling.modeling_qwem_moe import Qwen3MoEModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
@@ -134,7 +136,7 @@ parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
 parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
 
-parser.add_argument('--config', type=str, default="config/bge_moe_ese_all.yaml", help='Path to YAML config file.')
+parser.add_argument('--config', type=str, default="config/uae_moe_ese.yaml", help='Path to YAML config file.')
 
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],
@@ -161,8 +163,8 @@ parser.add_argument('--track_expert_metrics', type=bool, default=True,
                     help='Whether to track expert metrics, default True')
 parser.add_argument('--moe_layers', type=str, default='all',
                     help='Which layers to use MoE. Options: "all" or list like "[0,2,4,6]"')
-parser.add_argument('--expert_init_strategy', type=str, default='diverse',
-                    help='Expert initialization strategy, default diverse')
+parser.add_argument('--expert_init_strategy', type=str, default='identical',
+                     help='Expert initialization strategy, default identical, or "diverse"')
 parser.add_argument('--parallel_expert_computation', type=bool, default=False,
                     help='Whether to parallelize expert computation, default False')
 parser.add_argument('--moe_expert_intermediate_size', type=int, default=512)
@@ -266,27 +268,11 @@ def process_moe_layers_arg(moe_layers_str):
 
 
 def copy_matching_parameters(model, model_name_or_path, verbose=False):
-    from transformers import AutoModel
     pretrained_model = AutoModel.from_pretrained(model_name_or_path)
     pretrained_params = dict(pretrained_model.named_parameters())
     copied_count = 0
 
-    def get_custom_mapping(name):
-        # Special mapping of up/down proj for MoE expert
-        if "moe_block.experts" in name:
-            parts = name.split(".")
-            layer_idx = parts[2]
-            proj_type = parts[6]  # "up_proj" or "down_proj"
-            param_type = parts[7]  # "weight" or "bias"
-
-            if proj_type == "up_proj":
-                return f"encoder.layer.{layer_idx}.intermediate.dense.{param_type}"
-            elif proj_type == "down_proj":
-                return f"encoder.layer.{layer_idx}.output.dense.{param_type}"
-        return name
-
     for name, param in model.named_parameters():
-        # name = get_custom_mapping(name)
         if name in pretrained_params:
             if param.shape == pretrained_params[name].shape:
                 param.data.copy_(pretrained_params[name].data)
@@ -303,30 +289,60 @@ def copy_matching_parameters(model, model_name_or_path, verbose=False):
     logger.info(f"Copied {copied_count}/{len(model.state_dict())} parameters from pretrained model {model_name_or_path} to the model.")
     return model
 
-
 def load_bert_moe_model(args):
-    """Load BertMoE model with BERT pretrained weights."""
-    logger.info('Loading BertMoE model...')
+    """Load BertMoE or QwenMoE model with pretrained weights."""
+    logger.info('Loading MoE model...')
 
-    processed_moe_layers = process_moe_layers_arg(args.moe_layers)
-
-    moe_config = BertMoEConfig(
-        num_experts=args.num_experts,
-        top_k=args.top_k,
-        expert_dropout=args.expert_dropout,
-        router_temperature=args.router_temperature,
-        router_noise_epsilon=args.router_noise_epsilon,
-        router_training_noise=args.router_training_noise,
-        use_load_balancing=args.use_load_balancing,
-        router_z_loss_coef=args.router_z_loss_coef,
-        router_aux_loss_coef=args.router_aux_loss_coef,
-        track_expert_metrics=args.track_expert_metrics,
-        moe_layers=processed_moe_layers,
-        moe_expert_intermediate_size=args.moe_expert_intermediate_size,
-        moe_expert_compressed_size=args.moe_expert_compressed_size,
-    )
-    model = BertMoEModel(moe_config)
-    model = copy_matching_parameters(model, args.model_name_or_path)
+    # Step 1: Get pretrained config
+    pretrained_config = AutoConfig.from_pretrained(args.model_name_or_path)
+    logger.info(f"Loaded pretrained config: {args.model_name_or_path}")
+    
+    # Step 2: Create MoE parameters (common for both Bert and Qwen)
+    moe_params = {
+        'num_experts': args.num_experts,
+        'top_k': args.top_k,
+        'expert_dropout': args.expert_dropout,
+        'router_temperature': args.router_temperature,
+        'router_noise_epsilon': args.router_noise_epsilon,
+        'router_training_noise': args.router_training_noise,
+        'use_load_balancing': args.use_load_balancing,
+        'router_z_loss_coef': args.router_z_loss_coef,
+        'router_aux_loss_coef': args.router_aux_loss_coef,
+        'track_expert_metrics': args.track_expert_metrics,
+        'moe_layers': process_moe_layers_arg(args.moe_layers),
+        'expert_init_strategy': args.expert_init_strategy,
+        'parallel_expert_computation': args.parallel_expert_computation,
+        'moe_expert_intermediate_size': args.moe_expert_intermediate_size,
+        'moe_expert_compressed_size': args.moe_expert_compressed_size,
+    }
+    
+    # Step 3: Determine model type
+    is_qwen = 'qwen' in args.config.lower()
+    
+    # Step 4: Create MoE config
+    if is_qwen:
+        # Create Qwen3MoEConfig from pretrained config + MoE params
+        config_dict = pretrained_config.to_dict()
+        config_dict.update(moe_params)
+        moe_config = Qwen3MoEConfig(**config_dict)
+    else:
+        # Create BertMoEConfig from pretrained config + MoE params
+        config_dict = pretrained_config.to_dict()
+        # Remove keys that might cause issues
+        for key in ['architectures', 'auto_map', 'model_type']:
+            config_dict.pop(key, None)
+        config_dict.update(moe_params)
+        moe_config = BertMoEConfig(**config_dict)
+    
+    # Step 5: Create model
+    if is_qwen:
+        model = Qwen3MoEModel(moe_config)
+    else:
+        model = BertMoEModel(moe_config)
+    
+    # Copy matching parameters from pretrained model
+    model = copy_matching_parameters(model, args.model_name_or_path, verbose=True)
+    
     return model
 
 
