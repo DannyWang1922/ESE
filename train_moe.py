@@ -85,8 +85,6 @@ parser.add_argument('--lora_target_modules', type=str, default=None,
                     help='Specify lora_target_modules. comma serves as the splitter, such as `W,b`. Defaut None')
 parser.add_argument('--learning_rate', type=float, default=5e-5,
                     help='Specify learning_rate, defaut 1e-5')
-parser.add_argument('--warmup_steps', type=int, default=100,
-                    help='Specify warmup_steps, defaut 100')
 parser.add_argument('--logging_steps', type=int, default=100,
                     help='Specify logging_steps, defaut 100')
 parser.add_argument('--pooling_strategy', type=str, default='cls',
@@ -230,10 +228,6 @@ lora_config = {
 }
 if args.lora_target_modules is not None:
     lora_config['target_modules'] = [v.strip() for v in args.lora_target_modules.split(',') if v.strip()]
-
-os.makedirs(args.save_dir, exist_ok=True)
-with open(os.path.join(args.save_dir, "parser_para.json"), "w") as f:
-    json.dump(vars(args), f, indent=4)
 
 if args.torch_dtype == 'float32':
     args.torch_dtype = torch.float32
@@ -450,6 +444,32 @@ def load_and_process_valid_data(args, tokenizer, max_length, prompt_template=Non
     
     return valid_ds_processed
 
+def calculate_total_steps(train_ds, batch_size, epochs, gradient_accumulation_steps):
+    """
+    Calculate total training steps and warmup steps.
+    
+    Args:
+        train_ds: Training dataset
+        batch_size: Batch size per device
+        epochs: Number of training epochs
+        gradient_accumulation_steps: Number of gradient accumulation steps
+    
+    Returns:
+        tuple: (total_steps, warmup_steps)
+    """
+    if isinstance(train_ds, (list, tuple)):
+        num_examples = sum(len(ds) for ds in train_ds)
+    else:
+        num_examples = len(train_ds)
+    
+    steps_per_epoch = num_examples // (batch_size * gradient_accumulation_steps)
+    total_steps = steps_per_epoch * epochs
+    warmup_steps = max(1, int(total_steps * 0.05))  # 5% of total steps, minimum 1
+    
+    logger.info(f'Total training steps: {total_steps}')
+    logger.info(f'Warmup steps: {warmup_steps}')
+    
+    return total_steps, warmup_steps
 
 def main():
     back_bone_model = None
@@ -483,6 +503,20 @@ def main():
     train_ds = load_and_process_train_data(args, model.tokenizer, model.max_length, args.prompt_template)
     valid_ds = load_and_process_valid_data(args, model.tokenizer, model.max_length, args.prompt_template)
 
+    # Calculate total steps and warmup steps
+    total_steps, warmup_steps = calculate_total_steps(
+        train_ds=train_ds,
+        batch_size=args.batch_size,
+        epochs=args.epochs,
+        gradient_accumulation_steps=args.gradient_accumulation_steps
+    )
+    args.warmup_steps = warmup_steps
+
+    # Save updated args to json
+    os.makedirs(args.save_dir, exist_ok=True)
+    with open(os.path.join(args.save_dir, "parser_para.json"), "w") as f:
+        json.dump(vars(args), f, indent=4)
+
     argument_kwargs = {}
     if args.push_to_hub:
         assert args.hub_model_id is not None, 'Please specify hub_mode_id via --hub_model_id xxx'
@@ -511,6 +545,8 @@ def main():
             'last_layer_loss3_weight': args.last_layer_loss3_weight,
         })
 
+
+
     model.fit(
         train_ds=train_ds,
         valid_ds=valid_ds,
@@ -519,7 +555,7 @@ def main():
         epochs=args.epochs,
         learning_rate=args.learning_rate,
         save_steps=args.save_steps,
-        warmup_steps=args.warmup_steps,
+        warmup_steps=warmup_steps,  # Use calculated warmup steps
         logging_steps=args.logging_steps,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         loss_kwargs={
@@ -534,8 +570,8 @@ def main():
         argument_kwargs=argument_kwargs,
         apply_ese=args.apply_ese,
         trainer_kwargs=trainer_kwargs,
-        eval_steps =args.save_steps,
-        save_total_limit = 1,
+        eval_steps=args.save_steps,
+        save_total_limit=1,
     )
 
 
