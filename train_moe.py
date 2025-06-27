@@ -341,7 +341,7 @@ def load_bert_moe_model(args):
         model = BertMoEModel(moe_config)
     
     # Copy matching parameters from pretrained model
-    model = copy_matching_parameters(model, args.model_name_or_path, verbose=True)
+    model = copy_matching_parameters(model, args.model_name_or_path, verbose=False)
     
     return model
 

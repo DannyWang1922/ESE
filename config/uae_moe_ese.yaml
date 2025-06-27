@@ -6,6 +6,8 @@ save_dir: ./train_result/uae_moe_ese
 seed: 42
 workers: 16
 max_train_samples: None
+torch_dtype: bfloat16
+gradient_accumulation_steps: 2
 
 # configure Aoe
 cosine_w: 0.0
@@ -28,7 +30,7 @@ logging_steps: 500
 pooling_strategy: cls
 epochs: 5
 save_steps: 500
-batch_size: 24
+batch_size: 12
 maxlen: 512
 dataset_seed: 42
 

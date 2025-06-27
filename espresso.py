@@ -1015,6 +1015,13 @@ class AngleESETrainer(AngleTrainer):
                     kl_temperature=1.0
                 )
                 loss += alignment_loss
+
+        # Clean up MoE cache
+        if hasattr(model, 'encoder'):
+            for layer in model.encoder.layer:
+                if hasattr(layer, '_cached_moe_output'):
+                    layer._cached_moe_output = None
+
         return (loss, teacher_outputs) if return_outputs else loss
 
 
