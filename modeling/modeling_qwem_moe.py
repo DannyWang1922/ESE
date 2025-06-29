@@ -326,7 +326,7 @@ class Qwen3LayerWithMoEBlock(nn.Module):
         # Sliding window warning (from original Qwen3)
         if (
             config.sliding_window and config._attn_implementation != "flash_attention_2"
-        ):
+        ):  # diff with Llama is this warning
             logger.warning_once(
                 f"Sliding Window Attention is enabled but not implemented for `{config._attn_implementation}`; "
                 "unexpected results may be encountered."
@@ -341,7 +341,7 @@ class Qwen3LayerWithMoEBlock(nn.Module):
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
@@ -525,7 +525,7 @@ class Qwen3MoEModel(Qwen3PreTrainedModel):
 
         hidden_states = inputs_embeds
 
-        # Create position embeddings
+        # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
         # Expert metrics tracking initialization
@@ -536,7 +536,7 @@ class Qwen3MoEModel(Qwen3PreTrainedModel):
             self.expert_metrics["expert_load_balance"] = 0.0
             moe_layers_count = 0
 
-        # Decoder layers
+        # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
 
@@ -588,7 +588,7 @@ class Qwen3MoEModel(Qwen3PreTrainedModel):
 
         hidden_states = self.norm(hidden_states)
 
-        # Add hidden states from the last decoder layer
+        # add hidden states from the last decoder layer
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
@@ -618,8 +618,6 @@ class Qwen3MoEModel(Qwen3PreTrainedModel):
         past_key_values: Cache,
         output_attentions: bool = False,
     ):
-        """Update causal mask for attention computation."""
-        # Implementation follows the original Qwen3Model
         if self.config._attn_implementation == "flash_attention_2":
             if attention_mask is not None and past_key_values is not None:
                 is_padding_right = attention_mask[:, -1].sum().item() != input_tensor.size()[0]
@@ -654,9 +652,10 @@ class Qwen3MoEModel(Qwen3PreTrainedModel):
         dtype, device = input_tensor.dtype, input_tensor.device
         min_dtype = torch.finfo(dtype).min
         sequence_length = input_tensor.shape[1]
-        
+        # SlidingWindowCache or StaticCache
         if using_sliding_window_cache or using_static_cache:
             target_length = past_key_values.get_max_cache_shape()
+        # DynamicCache or no cache
         else:
             target_length = (
                 attention_mask.shape[-1]
@@ -718,7 +717,7 @@ class Qwen3MoEModel(Qwen3PreTrainedModel):
             causal_mask *= diagonal_attend_mask
             causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
             if attention_mask is not None:
-                causal_mask = causal_mask.clone()
+                causal_mask = causal_mask.clone()  # copy to contiguous memory for in-place edit
                 if attention_mask.shape[-1] > target_length:
                     attention_mask = attention_mask[:, :target_length]
                 mask_length = attention_mask.shape[-1]

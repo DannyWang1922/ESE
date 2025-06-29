@@ -85,6 +85,8 @@ parser.add_argument('--lora_target_modules', type=str, default=None,
                     help='Specify lora_target_modules. comma serves as the splitter, such as `W,b`. Defaut None')
 parser.add_argument('--learning_rate', type=float, default=5e-5,
                     help='Specify learning_rate, defaut 1e-5')
+parser.add_argument('--warmup_steps', type=int, default=100,
+                    help='Specify warmup_steps, defaut 100')
 parser.add_argument('--logging_steps', type=int, default=100,
                     help='Specify logging_steps, defaut 100')
 parser.add_argument('--pooling_strategy', type=str, default='cls',
@@ -471,6 +473,19 @@ def calculate_total_steps(train_ds, batch_size, epochs, gradient_accumulation_st
     
     return total_steps, warmup_steps
 
+def args_to_json_serializable(args):
+    """Convert args to JSON serializable format."""
+    args_dict = vars(args)
+    # Convert torch.dtype to string
+    if args_dict.get('torch_dtype') is not None:
+        if args_dict['torch_dtype'] == torch.float32:
+            args_dict['torch_dtype'] = 'float32'
+        elif args_dict['torch_dtype'] == torch.float16:
+            args_dict['torch_dtype'] = 'float16'
+        elif args_dict['torch_dtype'] == torch.bfloat16:
+            args_dict['torch_dtype'] = 'bfloat16'
+    return args_dict
+
 def main():
     back_bone_model = None
     if args.use_bert_moe:
@@ -515,7 +530,7 @@ def main():
     # Save updated args to json
     os.makedirs(args.save_dir, exist_ok=True)
     with open(os.path.join(args.save_dir, "parser_para.json"), "w") as f:
-        json.dump(vars(args), f, indent=4)
+        json.dump(args_to_json_serializable(args), f, indent=4)
 
     argument_kwargs = {}
     if args.push_to_hub:
