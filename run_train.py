@@ -2,14 +2,14 @@ import subprocess
 import sys
 
 # Training configuration
-nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0"
+nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
 
 # ============ 实验配置区域 - 只需修改这里 ============
 # 当前实验的超参数配置
 CURRENT_EXPERIMENT = {
-    "config": "bge_moe_ese_all.yaml",  # 使用的配置文件
-    "epochs": 5,                        # 训练轮数
-    "last_layer_loss_weight": [0.5, 1.0],
+    "config": "uae_ese.yaml",  # 使用的配置文件
+    # "config": "uae_base.yaml",  # 使用的配置文件
+    "epochs": 3,                        # 训练轮数,
     
     # 当前实验中要尝试的超参数及其取值范围（以下参数根据需要可以注释掉不需要的）
     # "last_layer_loss_weight": [0.05, 0.1],
