@@ -9,6 +9,7 @@ $ bash download_dataset.sh
 import sys
 import os
 import logging
+from datetime import datetime
 
 logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
 import torch
@@ -31,11 +32,20 @@ import senteval  # type: ignore
 
 PATH_TO_DATA = './SentEval/data'
 
-def print_table(task_names, scores):
+def print_table(task_names, scores, out_dir=None):
     tb = PrettyTable()
     tb.field_names = task_names
     tb.add_row(scores)
     print(tb)
+    
+    if out_dir:  # save to txt file
+        result_file_path = os.path.join(out_dir, "main_result.txt")
+        with open(result_file_path, "w") as f:
+            f.write(f"Evaluation Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n") # Add timestamps and separators
+            f.write("="*80 + "\n\n")
+            f.write(str(tb))
+            f.write("\n")
+        print(f"\nMain results saved to: {result_file_path}")
 
 def save_table_as_csv(task_names, scores, layer_scores, out_dir): 
     csv_path = os.path.join(out_dir, "main_table.csv")
@@ -248,7 +258,7 @@ def main():
     scores.append("%.2f" % pavg)
     task_names.append("≺ Avg.")
 
-    print_table(task_names, scores)
+    print_table(task_names, scores, args.out_dir)
     save_table_as_csv(task_names, scores, layer_scores, args.out_dir)
 
 if __name__ == "__main__":
