@@ -7,7 +7,7 @@ nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
 # ============ 实验配置区域 - 只需修改这里 ============
 # 当前实验的超参数配置
 CURRENT_EXPERIMENT = {
-    "config": "uae_ese.yaml",  # 使用的配置文件
+    "config": "qwen_raw.yaml",  # 使用的配置文件
     # "config": "uae_base.yaml",  # 使用的配置文件
     "epochs": 3,                        # 训练轮数,
     
@@ -51,14 +51,20 @@ def generate_eval_commands(trained_models):
     for cmd, save_dir in trained_models:
         model_path = f"{save_dir}/best-checkpoint"
         out_dir = f"evl_res/{save_dir.split('/')[-1]}"
-        
-        # 根据模型类型设置is_moe参数
+
+        if "qwen" in model_path:
+            pooling_strategy = "last"
+            is_llm = 1
+        else:
+            pooling_strategy = "cls"
+            is_llm = 0
+
         if "moe" in save_dir.lower():
             is_moe = "1"
         else:
             is_moe = "0"
-        
-        cmd = f"{nv_cmd} python eval_nli_main_v2.py --model_name_or_path {model_path} --out_dir {out_dir} --is_moe {is_moe}"
+            
+        cmd = f"{nv_cmd} python eval_nli_main_v2.py --model_name_or_path {model_path} --out_dir {out_dir} --is_moe {is_moe} --pooling_strategy {pooling_strategy} --is_llm {is_llm}"
         eval_cmd_list.append(cmd)
     return eval_cmd_list
 
@@ -98,7 +104,8 @@ def main():
     print("\nEvaluation Commands:")
     # for cmd in eval_commands:
     #     print(cmd)
-    
+
+    # 运行评估
     run_commands(eval_commands, is_eval=True)
 
 if __name__ == "__main__":

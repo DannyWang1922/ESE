@@ -188,34 +188,37 @@ def evaluate_layers_with_sizes(layer_indices, embedding_sizes, args, model, toke
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path")
     parser.add_argument("--pooling_strategy", type=str, default='cls', help="Pooling strategy")
+    parser.add_argument("--prompt_template", type=str, default=None, help="Prompt template")
+    parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Is it a large language model. Default: 0")
+    parser.add_argument('--batch_size', type=int, default=512, help="Eavluation batch size")
+    parser.add_argument('--is_moe', type=int, default=1, help="Eavluation batch size")
+    parser.add_argument('--embedding_size_list', type=str, default="32,64,128,256,512,640,768", help="Comma-separated list of embedding sizes to evaluate")
+
+    parser.add_argument('--out_dir', type=str, default="evl_res/main", help="Directory to save output files")
     parser.add_argument("--layer_index", type=int, default=-1, help="Layer index to evaluate")
     parser.add_argument("--embedding_start", type=int, default=0, help="Embedding start position")
     parser.add_argument("--embedding_size", type=int, default=None, help="Embedding size")
-    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Model name or path") # Qwen/Qwen1.5-0.5B, WhereIsAI/ese-qwen-0.5b-nli, BAAI/bge-base-en-v1.5, WhereIsAI/UAE-Large-V1 
-    parser.add_argument("--prompt_template", type=str, default=None)
-    # parser.add_argument("--prompt_template", type=str, default="Represent following sentence for general embedding: {text} <|end_of_text|>", help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
     parser.add_argument("--mode", type=str, choices=['dev', 'test', 'fasttest'], default='test', help="Evaluation mode")
     parser.add_argument("--task_set", type=str, choices=['sts', 'transfer', 'full', 'na'], default='sts', help="Task set")
     parser.add_argument('--lora_weight', type=str, default=None, help="LoRA weight path")
-    parser.add_argument('--out_dir', type=str, default="evl_res/main", help="Directory to save output files")
-    parser.add_argument('--batch_size', type=int, default=512, help="Eavluation batch size")
-    parser.add_argument('--is_moe', type=int, default=1, help="Eavluation batch size")
-    parser.add_argument('--embedding_size_list', type=str, default="32,64,128,256,512,640,768", 
-                        help="Comma-separated list of embedding sizes to evaluate")
-
+    
     args = parser.parse_args()
+    
+    # Conditionally set prompt template based on model name
+    if "qwen" in args.model_name_or_path.lower():
+        args.prompt_template = "Instruct: Retrieve semantically similar text\nQuery:{text}"
+    else:
+        args.prompt_template = None
     
     # Convert strings "none", "true", "false" to their actual Python types
     for arg in vars(args):
         val = getattr(args, arg)
         if isinstance(val, str) and val.lower() in {"none", "true", "false"}:
             setattr(args, arg, {"none": None, "true": True, "false": False}[val.lower()])
-
-    # 解析 embedding_size_list
-    embedding_sizes = [int(x.strip()) for x in args.embedding_size_list.split(',')]
 
     os.makedirs(args.out_dir, exist_ok=True)  
     with open(os.path.join(args.out_dir, "parser_para.json"), "w") as f:
@@ -225,23 +228,25 @@ def main():
     print("Using device:", device)
     
     # Initialize model, tokenizer, and Pooler
-    tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+    if "qwen" in args.model_name_or_path.lower():
+        tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
+    elif "bge" in args.model_name_or_path.lower():
+        tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-base-en-v1.5")
+    elif "uae" in args.model_name_or_path.lower():
+        tokenizer = AutoTokenizer.from_pretrained("WhereIsAI/UAE-Large-V1")
+    else:
+        tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+    
     if args.is_moe:
         backbone = BertMoEModel.from_pretrained(
                 args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
     else:
-        if args.is_llm:            
-            backbone = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
-        else:
-            backbone = AutoModel.from_pretrained(
-                args.model_name_or_path, output_hidden_states=True).to(device)
+        backbone = AutoModel.from_pretrained(
+            args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
 
         if args.is_llm and args.lora_weight:
-            backbone = PeftModel.from_pretrained(
-                backbone, args.lora_weight, torch_dtype=torch.float16, device_map='auto',)
+            backbone = PeftModel.from_pretrained(backbone, args.lora_weight, torch_dtype=torch.float16, device_map='auto')
             backbone.print_trainable_parameters()
-
     model = Pooler(backbone, pooling_strategy=args.pooling_strategy)
     
     
@@ -293,6 +298,9 @@ def main():
     print("\n[Max Avg. & ≺ Avg.] Computing STS performance across embedding sizes for all non-final layers...")
     layer_indices = list(range(1, n_layers))  # Exclude the last layer
     sts_tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
+    
+    # Get embedding_size_list
+    embedding_sizes = [int(x.strip()) for x in args.embedding_size_list.split(',')]
     
     # Obtain the best score and default score for each layer
     layer_best_scores, layer_all_scores, layer_default_scores = evaluate_layers_with_sizes(
