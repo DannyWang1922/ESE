@@ -29,6 +29,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('Espresso')
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--config', type=str, default="config/qwen_base.yaml", help='Path to YAML config file.')
+
 parser.add_argument('--model_name_or_path', type=str, default="BAAI/bge-base-en-v1.5",
                     help='Specify model name or path to set transformer backbone, required')
 parser.add_argument('--pretrained_model_path', type=str, default=None,
@@ -135,8 +137,6 @@ parser.add_argument('--teacher_pooling_strategy', type=str, default='cls',
 # parser.add_argument('--wandb_project', type=str, default="ESE_MoE", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_project', type=str, default="None", help='Specify WANDB_PROJECT, default None')
 parser.add_argument('--wandb_log_model', type=str, default="false", help='Specify WANDB_LOG_MODEL, default None')
-
-parser.add_argument('--config', type=str, default="config/uae_moe_ese.yaml", help='Path to YAML config file.')
 
 # BertMoE specific arguments
 parser.add_argument('--use_bert_moe', type=int, default=1, choices=[0, 1],
