@@ -107,7 +107,7 @@ parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
                     help='Specify gradient_accumulation_steps, default 1')
 parser.add_argument('--torch_dtype', type=str, default=None, choices=['auto', 'float32', 'float16', 'bfloat16'],
                     help='Specify torch_dtype from [`auto`, `float32`, `float16`, `bfloat16`], default None')
-parser.add_argument('--fp16', type=int, default=None, choices=[0, 1],
+parser.add_argument('--fp16', type=int, default=0, choices=[0, 1],
                     help='Specify fp16, choices [0, 1], default None')
 parser.add_argument('--push_to_hub', type=int, default=0, choices=[0, 1], help='Specify push_to_hub, default 0')
 parser.add_argument('--hub_private_repo', type=int, default=1, choices=[0, 1],

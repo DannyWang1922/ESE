@@ -1278,7 +1278,11 @@ class AnglE:
             if train_mode:
                 logger.info(f'lora_config={lora_config}')
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
+        if "qwen" in model_name_or_path.lower():
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True, padding_side='left')
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
+        
         if tokenizer_padding_side is not None and self.tokenizer.padding_side != tokenizer_padding_side:
             self.tokenizer.padding_side = tokenizer_padding_side
         if self.is_llm and self.tokenizer.pad_token_id is None:
