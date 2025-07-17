@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import json
 import os
 import logging
@@ -8,6 +6,7 @@ import random
 import sys
 
 import numpy as np
+import matplotlib.pyplot as plt
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 from pydantic import NonNegativeInt
 import torch
@@ -285,7 +284,7 @@ def copy_matching_parameters(model, model_name_or_path, verbose=False):
     logger.info(f"Copied {copied_count}/{len(model.state_dict())} parameters from pretrained model {model_name_or_path} to the model.")
     return model
 
-def load_bert_moe_model(args):
+def load_moe_model(args):
     """Load BertMoE or QwenMoE model with pretrained weights."""
     logger.info('Loading MoE model...')
 
@@ -392,6 +391,9 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
             combined_dataset = combined_dataset.concatenate(ds)
     else:
         combined_dataset = concatenate_datasets(all_train_datasets)
+    
+    # Analyze token length distribution
+    # length_stats = analyze_token_lengths(combined_dataset, logger)
         
         # If max_train_samples is set and we have multiple datasets, ensure the combined dataset doesn't exceed the limit
         if args.max_train_samples is not None and len(combined_dataset) > args.max_train_samples:
@@ -406,6 +408,84 @@ def load_and_process_train_data(args, tokenizer, max_length, prompt_template=Non
         num_proc=args.workers)
     
     return train_ds
+
+
+def analyze_token_lengths(combined_dataset, logger):
+    """
+    Analyze the token length distribution of sentences in the dataset.
+
+    Args:
+        combined_dataset: The merged dataset
+        logger: Logger for recording messages
+
+    Returns:
+        dict: A dictionary containing statistical information
+    """
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B", trust_remote_code=True, padding_side='left')
+
+    # Calculate the token lengths of all sentences
+    lengths = [
+        len(tokenizer(example["text1"], example["text2"], truncation=False)["input_ids"])
+        for example in combined_dataset 
+    ]
+
+    # Find the maximum sentence length
+    max_length = max(lengths)
+    logger.info(f"Maximum token length: {max_length}")
+
+    # Calculate the percentage of sentences with length > 256
+    long_sentences = [l for l in lengths if l > 256]
+    percentage_above_256 = (len(long_sentences) / len(lengths)) * 100
+    logger.info(f"Number of sentences longer than 256 tokens: {len(long_sentences)}")
+    logger.info(f"Percentage of sentences longer than 256 tokens: {percentage_above_256:.2f}%")
+
+    # Output some statistical information
+    logger.info(f"Total number of sentences: {len(lengths)}")
+    logger.info(f"Average token length: {sum(lengths) / len(lengths):.2f}")
+    logger.info(f"Minimum token length: {min(lengths)}")
+
+    # Visualize token length distribution
+    plt.figure(figsize=(12, 6))
+
+    # Main histogram
+    plt.subplot(1, 2, 1)
+    plt.hist(lengths, bins=50, color='skyblue', edgecolor='black')
+    plt.xlabel("Token Length")
+    plt.ylabel("Number of Samples")
+    plt.title("Token Length Distribution")
+    plt.grid(True)
+
+    # Add a vertical line marking length=256
+    plt.axvline(x=256, color='red', linestyle='--', alpha=0.7, label=f'Length=256 ({percentage_above_256:.1f}% above)')
+    plt.legend()
+
+    # Show distribution of sentences longer than 256
+    plt.subplot(1, 2, 2)
+    if long_sentences:
+        plt.hist(long_sentences, bins=30, color='orange', edgecolor='black')
+        plt.xlabel("Token Length")
+        plt.ylabel("Number of Samples")
+        plt.title("Distribution of Long Sentences (>256 tokens)")
+        plt.grid(True)
+    else:
+        plt.text(0.5, 0.5, 'No sentences longer than 256 tokens', 
+                ha='center', va='center', transform=plt.gca().transAxes)
+        plt.title("No Long Sentences")
+
+    plt.tight_layout()
+    plt.savefig("token_length_distribution.png", dpi=300, bbox_inches='tight')
+    plt.show()
+
+    # Return statistics dictionary
+    return {
+        'max_length': max_length,
+        'min_length': min(lengths),
+        'avg_length': sum(lengths) / len(lengths),
+        'total_samples': len(lengths),
+        'long_sentences_count': len(long_sentences),
+        'percentage_above_256': percentage_above_256,
+        'lengths': lengths
+    }
 
 
 def load_and_process_valid_data(args, tokenizer, max_length, prompt_template=None):
@@ -490,7 +570,7 @@ def main():
     back_bone_model = None
     if args.use_bert_moe:
         # Load BertMoE model
-        back_bone_model = load_bert_moe_model(args)
+        back_bone_model = load_moe_model(args)
         if args.torch_dtype == 'bfloat16':
             back_bone_model = back_bone_model.to(dtype=torch.bfloat16)
         total_params = sum(p.numel() for p in back_bone_model.parameters())
@@ -559,7 +639,6 @@ def main():
             'prior_layers_weight': args.prior_layers_weight,
             'last_layer_loss3_weight': args.last_layer_loss3_weight,
         })
-
 
 
     model.fit(

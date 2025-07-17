@@ -43,6 +43,7 @@ ese_kl_temperature: 1.0
 
 # configure MoE
 use_bert_moe: 1
+top_k: 2
 num_experts: 4
 moe_layers: all
 moe_expert_intermediate_size: 512
