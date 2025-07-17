@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import itertools
 
 # Training configuration
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
@@ -25,25 +26,34 @@ CURRENT_EXPERIMENT = {
 def generate_train_commands():
     train_cmd_list = []
     
-    # 获取要实验的超参数及其取值
-    param_to_test = None
-    param_values = None
+    # 获取所有要实验的超参数及其取值
+    params_to_test = {}
     for param, values in CURRENT_EXPERIMENT.items():
         if isinstance(values, list):
-            param_to_test = param
-            param_values = values
-            break
+            params_to_test[param] = values
     
-    if param_to_test is None:
+    if not params_to_test:
         # 如果没有要测试的超参数，就只运行一次基础配置
         save_dir = f"train_result/{CURRENT_EXPERIMENT['config'].replace('.yaml', '')}"
         cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{CURRENT_EXPERIMENT['config']} --epochs {CURRENT_EXPERIMENT['epochs']}"
         train_cmd_list.append((cmd, save_dir))
     else:
-        # 针对要测试的超参数生成命令
-        for value in param_values:
-            save_dir = f"train_result/{CURRENT_EXPERIMENT['config'].replace('.yaml', '')}_{param_to_test}_{value}"
-            cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{CURRENT_EXPERIMENT['config']} --epochs {CURRENT_EXPERIMENT['epochs']} --{param_to_test} {value}"
+        # 获取所有参数值的组合
+        param_names = list(params_to_test.keys())
+        param_values_list = list(params_to_test.values())
+        
+        # 生成所有可能的参数组合
+        for combination in itertools.product(*param_values_list):
+            # 构建参数字符串
+            param_str = ""
+            save_dir_suffix = ""
+            
+            for param_name, value in zip(param_names, combination):
+                param_str += f" --{param_name} {value}"
+                save_dir_suffix += f"_{param_name}_{value}"
+            
+            save_dir = f"train_result/{CURRENT_EXPERIMENT['config'].replace('.yaml', '')}{save_dir_suffix}"
+            cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{CURRENT_EXPERIMENT['config']} --epochs {CURRENT_EXPERIMENT['epochs']}{param_str}"
             train_cmd_list.append((cmd, save_dir))
     
     return train_cmd_list
@@ -66,7 +76,7 @@ def generate_eval_commands(trained_models):
         else:
             is_moe = "0"
             
-        cmd = f"{nv_cmd} python eval_nli_main_v2.py --model_name_or_path {model_path} --out_dir {out_dir} --is_moe {is_moe} --pooling_strategy {pooling_strategy} --is_llm {is_llm}"
+        cmd = f"{nv_cmd} python eval_nli_main.py --model_name_or_path {model_path} --out_dir {out_dir} --is_moe {is_moe} --pooling_strategy {pooling_strategy} --is_llm {is_llm}"
         eval_cmd_list.append(cmd)
     return eval_cmd_list
 
