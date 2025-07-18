@@ -86,8 +86,7 @@ parser.add_argument('--lora_target_modules', type=str, default=None,
                     help='Specify lora_target_modules. comma serves as the splitter, such as `W,b`. Defaut None')
 parser.add_argument('--learning_rate', type=float, default=5e-5,
                     help='Specify learning_rate, defaut 1e-5')
-parser.add_argument('--warmup_steps', type=int, default=100,
-                    help='Specify warmup_steps, defaut 100')
+parser.add_argument('--warmup_steps', type=int, default=None,help='Specify warmup_steps, defaut 100')
 parser.add_argument('--logging_steps', type=int, default=100,
                     help='Specify logging_steps, defaut 100')
 parser.add_argument('--pooling_strategy', type=str, default='cls',
@@ -106,7 +105,7 @@ parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
                     help='Specify gradient_accumulation_steps, default 1')
 parser.add_argument('--torch_dtype', type=str, default=None, choices=['auto', 'float32', 'float16', 'bfloat16'],
                     help='Specify torch_dtype from [`auto`, `float32`, `float16`, `bfloat16`], default None')
-parser.add_argument('--fp16', type=int, default=0, choices=[0, 1],
+parser.add_argument('--fp16', type=int, default=None, choices=[0, 1],
                     help='Specify fp16, choices [0, 1], default None')
 parser.add_argument('--push_to_hub', type=int, default=0, choices=[0, 1], help='Specify push_to_hub, default 0')
 parser.add_argument('--hub_private_repo', type=int, default=1, choices=[0, 1],
@@ -162,7 +161,7 @@ parser.add_argument('--track_expert_metrics', type=bool, default=True,
                     help='Whether to track expert metrics, default True')
 parser.add_argument('--moe_layers', type=str, default='all',
                     help='Which layers to use MoE. Options: "all" or list like "[0,2,4,6]"')
-parser.add_argument('--expert_init_strategy', type=str, default='identical',
+parser.add_argument('--expert_init_strategy', type=str, default='diverse',
                      help='Expert initialization strategy, default identical, or "diverse"')
 parser.add_argument('--parallel_expert_computation', type=bool, default=False,
                     help='Whether to parallelize expert computation, default False')
@@ -598,14 +597,15 @@ def main():
     train_ds = load_and_process_train_data(args, model.tokenizer, model.max_length, args.prompt_template)
     valid_ds = load_and_process_valid_data(args, model.tokenizer, model.max_length, args.prompt_template)
 
-    # Calculate total steps and warmup steps
-    total_steps, warmup_steps = calculate_total_steps(
-        train_ds=train_ds,
-        batch_size=args.batch_size,
-        epochs=args.epochs,
-        gradient_accumulation_steps=args.gradient_accumulation_steps
-    )
-    args.warmup_steps = warmup_steps
+    if args.warmup_steps is None:
+        # Calculate total steps and warmup steps
+        total_steps, warmup_steps = calculate_total_steps(
+            train_ds=train_ds,
+            batch_size=args.batch_size,
+            epochs=args.epochs,
+            gradient_accumulation_steps=args.gradient_accumulation_steps
+        )
+        args.warmup_steps = warmup_steps
 
     # Save updated args to json
     os.makedirs(args.save_dir, exist_ok=True)
@@ -649,7 +649,7 @@ def main():
         epochs=args.epochs,
         learning_rate=args.learning_rate,
         save_steps=args.save_steps,
-        warmup_steps=warmup_steps,  # Use calculated warmup steps
+        warmup_steps=args.warmup_steps,  # Use calculated warmup steps
         logging_steps=args.logging_steps,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         loss_kwargs={
