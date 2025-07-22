@@ -24,7 +24,7 @@ import numpy as np
     
 # Import SentEval
 sys.path.insert(0, './SentEval')
-import senteval # type: ignore
+import senteval
 
 
 PATH_TO_DATA = './SentEval/data'
@@ -59,16 +59,13 @@ def lock_and_write_file(file_path, content):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--is_llm", type=int, default=0, choices=[0, 1], help="Whether the model is a LLM. Default: 0")
-    parser.add_argument("--pooling_strategy", type=str, default='cls')
+    parser.add_argument("--pooling_strategy", type=str, default='last')
     parser.add_argument("--layer_index", type=int, default=-1)
     parser.add_argument("--embedding_start", type=int, default=0)
     parser.add_argument("--embedding_size", type=int, default=None)
-    parser.add_argument("--model_name_or_path", type=str, default="BAAI/bge-base-en-v1.5", help="Transformers' model name or path")
-    # parser.add_argument("--prompt_template", type=str,
-    #                     default="Represent following sentence for general embedding: {text} <|end_of_text|>",
-    #                     help="Prompt template")
+    parser.add_argument("--model_name_or_path", type=str, help="Transformers' model name or path")
     parser.add_argument("--prompt_template", type=str,
-                        default=None,
+                        default="Represent following sentence for general embedding: {text} <|end_of_text|>",
                         help="Prompt template")
     parser.add_argument("--max_length", type=int, default=512, help="max len")
     parser.add_argument("--mode", type=str,
@@ -94,15 +91,12 @@ def main():
     if args.pretrained_model_path == 'None':
         args.pretrained_model_path = None
 
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    device = torch.device("cuda:0" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
-
     if args.is_llm:
         backbone = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto').to(device)
+            args.model_name_or_path, output_hidden_states=True, torch_dtype=torch.float16, device_map='auto')
     else:
         backbone = AutoModel.from_pretrained(
-            args.model_name_or_path, output_hidden_states=True).to(device)
+            args.model_name_or_path, output_hidden_states=True).cuda()
 
     if args.is_llm and args.lora_weight:
         backbone = PeftModel.from_pretrained(
@@ -117,6 +111,7 @@ def main():
     model = Pooler(backbone, pooling_strategy=args.pooling_strategy)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set up the tasks
     if args.task_set == 'sts':
@@ -137,8 +132,8 @@ def main():
                                          'tenacity': 3, 'epoch_size': 2}
     elif args.mode == 'test':
         # Full mode
-        params = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10, 'batch_size': 16}  # 16
-        params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 64,  # 64
+        params = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10, 'batch_size': 8}  # 16
+        params['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 32,  # 64
                                          'tenacity': 5, 'epoch_size': 4}
     else:
         raise NotImplementedError
@@ -275,3 +270,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -178,7 +178,7 @@ parser.add_argument('--last_layer_loss3_weight', type=float, default=0.5)
 
 
 # Add data loading amount argument
-parser.add_argument('--max_train_samples', type=str, default="10000",
+parser.add_argument('--max_train_samples', type=str, default="None",
                     help='Maximum number of training samples to load. If None, load all data. Default None')
 parser.add_argument('--max_valid_samples', type=str, default=None,
                     help='Maximum number of validation samples to load. If None, load all data. Default None')

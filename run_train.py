@@ -5,16 +5,16 @@ import itertools
 # Training configuration
 nv_cmd = "NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1"
 
-# ============ 实验配置区域 - 只需修改这里 ============
-# 当前实验的超参数配置
+# ============ Experiment Configuration Area - Only modify here ============
+# Current experiment hyperparameter configuration
 CURRENT_EXPERIMENT = {
-    "config": "bge_moe_ese.yaml",  # 使用的配置文件
-    # "config": "uae_base.yaml",  # 使用的配置文件
-    "epochs": 1,                        # 训练轮数,
+    "config": "bge_moe_ese.yaml",  # Configuration file to use
+    # "config": "uae_base.yaml",  # Configuration file to use
+    "epochs": 1,                        # Number of training epochs,
     "top_k": [2],
     "num_experts": [4],
     
-    # 当前实验中要尝试的超参数及其取值范围（以下参数根据需要可以注释掉不需要的）
+    # Hyperparameters to test in current experiment and their value ranges (parameters below can be commented out as needed)
     # "last_layer_loss_weight": [0.05, 0.1],
     # "learning_rate": [5e-6, 1e-6],
     # "loss_decay_type": [0, 2],
@@ -26,25 +26,25 @@ CURRENT_EXPERIMENT = {
 def generate_train_commands():
     train_cmd_list = []
     
-    # 获取所有要实验的超参数及其取值
+    # Get all hyperparameters to experiment with and their values
     params_to_test = {}
     for param, values in CURRENT_EXPERIMENT.items():
         if isinstance(values, list):
             params_to_test[param] = values
     
     if not params_to_test:
-        # 如果没有要测试的超参数，就只运行一次基础配置
+        # If there are no hyperparameters to test, just run the basic configuration once
         save_dir = f"train_result/{CURRENT_EXPERIMENT['config'].replace('.yaml', '')}"
         cmd = f"{nv_cmd} python train_moe.py --save_dir {save_dir} --config config/{CURRENT_EXPERIMENT['config']} --epochs {CURRENT_EXPERIMENT['epochs']}"
         train_cmd_list.append((cmd, save_dir))
     else:
-        # 获取所有参数值的组合
+        # Get all parameter value combinations
         param_names = list(params_to_test.keys())
         param_values_list = list(params_to_test.values())
         
-        # 生成所有可能的参数组合
+        # Generate all possible parameter combinations
         for combination in itertools.product(*param_values_list):
-            # 构建参数字符串
+            # Build parameter string
             param_str = ""
             save_dir_suffix = ""
             
@@ -81,10 +81,10 @@ def generate_eval_commands(trained_models):
     return eval_cmd_list
 
 def run_commands(cmd_list, is_eval=False):
-    """执行命令列表"""
+    """Execute command list"""
     for cmd in cmd_list:
         if isinstance(cmd, tuple):
-            cmd = cmd[0]  # 提取训练命令
+            cmd = cmd[0]  # Extract training command
             
         print(f"\nRunning {'evaluation' if is_eval else 'training'} command: {cmd}\n")
         try:
@@ -102,22 +102,22 @@ def run_commands(cmd_list, is_eval=False):
                 sys.exit(1)
 
 def main():
-    # 生成训练命令
+    # Generate training commands
     train_commands = generate_train_commands()
     # print("\nTraining Commands:")
     # for cmd, _ in train_commands:
     #     print(cmd)
     
-    # 运行训练
+    # Run training
     run_commands(train_commands)
     
-    # 生成并运行评估命令
+    # Generate and run evaluation commands
     eval_commands = generate_eval_commands(train_commands)
     # print("\nEvaluation Commands:")
     # for cmd in eval_commands:
     #     print(cmd)
 
-    # 运行评估
+    # Run evaluation
     run_commands(eval_commands, is_eval=True)
 
 if __name__ == "__main__":

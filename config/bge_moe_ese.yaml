@@ -2,7 +2,7 @@ model_name_or_path: BAAI/bge-base-en-v1.5
 train_split_name: train
 valid_name_or_path: mteb/stsbenchmark-sts
 valid_split_name: test
-save_dir: ./train_result/bge_moe_ese_all
+save_dir: ./train_result/bge_moe_ese
 seed: 42
 workers: 16
 max_train_samples: None
@@ -50,7 +50,8 @@ moe_expert_intermediate_size: 512
 moe_expert_compressed_size: 128
 track_expert_metrics: True
 
+# configure loss decay
 loss_decay_type: 2
 prior_layers_weight: 0.8
 last_layer_loss_weight: 1.0
-last_layer_loss3_weight: 0.0
+last_layer_loss3_weight: 1.0
